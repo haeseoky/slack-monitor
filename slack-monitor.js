@@ -17,9 +17,13 @@ const CONFIG = {
   // 알림 조건
   notifyOnError: process.env.NOTIFY_ON_ERROR !== 'false',
   notifyOnSuccess: process.env.NOTIFY_ON_SUCCESS === 'true',
+  notifyOnSlowResponse: process.env.NOTIFY_ON_SLOW_RESPONSE !== 'false',
 
   // 요약 알림 (여러 API 결과를 한 번에 전송)
   sendSummary: process.env.SEND_SUMMARY !== 'false',
+
+  // 응답 시간 임계값 (밀리초)
+  responseTimeThreshold: parseInt(process.env.RESPONSE_TIME_THRESHOLD) || 1000,
 };
 
 // 슬랙 Webhook 초기화
@@ -46,6 +50,9 @@ async function checkSingleApi(apiConfig) {
     const response = await axios(requestConfig);
     const responseTime = Date.now() - startTime;
 
+    // 응답 시간이 임계값을 초과하는지 확인
+    const isSlow = responseTime > CONFIG.responseTimeThreshold;
+
     const result = {
       apiId: apiConfig.id,
       apiName: apiConfig.name,
@@ -55,10 +62,12 @@ async function checkSingleApi(apiConfig) {
       statusCode: response.status,
       responseTime: responseTime,
       responseTimeStr: `${responseTime}ms`,
+      isSlow: isSlow,
       timestamp: new Date().toISOString(),
     };
 
-    console.log(`✓ [${apiConfig.name}] 체크 성공 - 응답시간: ${responseTime}ms`);
+    const slowWarning = isSlow ? ` ⚠️ 느림 (임계값: ${CONFIG.responseTimeThreshold}ms)` : '';
+    console.log(`✓ [${apiConfig.name}] 체크 성공 - 응답시간: ${responseTime}ms${slowWarning}`);
 
     return result;
   } catch (error) {
@@ -101,8 +110,9 @@ async function checkAllApis() {
   // 결과 요약
   const successCount = results.filter(r => r.status === 'success').length;
   const errorCount = results.filter(r => r.status === 'error').length;
+  const slowCount = results.filter(r => r.status === 'success' && r.isSlow).length;
 
-  console.log(`\n📈 체크 완료: 성공 ${successCount}개, 실패 ${errorCount}개`);
+  console.log(`\n📈 체크 완료: 성공 ${successCount}개, 실패 ${errorCount}개, 느림 ${slowCount}개`);
 
   // 슬랙 알림 전송
   if (CONFIG.sendSummary) {
@@ -112,7 +122,8 @@ async function checkAllApis() {
     // 개별 알림
     for (const result of results) {
       if ((result.status === 'error' && CONFIG.notifyOnError) ||
-          (result.status === 'success' && CONFIG.notifyOnSuccess)) {
+          (result.status === 'success' && CONFIG.notifyOnSuccess) ||
+          (result.isSlow && CONFIG.notifyOnSlowResponse)) {
         await sendToSlack(result);
       }
     }
@@ -125,8 +136,9 @@ async function checkAllApis() {
 async function sendToSlack(result) {
   try {
     const isError = result.status === 'error';
-    const color = isError ? 'danger' : 'good';
-    const emoji = isError ? '🔴' : '🟢';
+    const isSlow = result.isSlow && !isError;
+    const color = isError ? 'danger' : isSlow ? 'warning' : 'good';
+    const emoji = isError ? '🔴' : isSlow ? '🟡' : '🟢';
 
     await webhook.send({
       text: `${emoji} [${result.apiName}] API 모니터링 결과`,
@@ -152,7 +164,9 @@ async function sendToSlack(result) {
             },
             {
               title: 'Response Time',
-              value: result.responseTimeStr || 'N/A',
+              value: result.responseTimeStr ?
+                (result.isSlow ? `⚠️ ${result.responseTimeStr} (임계값: ${CONFIG.responseTimeThreshold}ms 초과)` : result.responseTimeStr) :
+                'N/A',
               short: true,
             },
             {
@@ -188,20 +202,22 @@ async function sendSummaryToSlack(results) {
   try {
     const successCount = results.filter(r => r.status === 'success').length;
     const errorCount = results.filter(r => r.status === 'error').length;
+    const slowCount = results.filter(r => r.status === 'success' && r.isSlow).length;
     const totalCount = results.length;
 
     // 전체 상태 결정
-    const overallStatus = errorCount === 0 ? 'success' : errorCount === totalCount ? 'critical' : 'warning';
+    const overallStatus = errorCount === 0 ? (slowCount > 0 ? 'warning' : 'success') : errorCount === totalCount ? 'critical' : 'warning';
     const emoji = overallStatus === 'success' ? '🟢' : overallStatus === 'critical' ? '🔴' : '🟡';
     const color = overallStatus === 'success' ? 'good' : overallStatus === 'critical' ? 'danger' : 'warning';
 
-    // 에러가 있거나 성공 알림이 활성화된 경우만 전송
-    if (errorCount > 0 || CONFIG.notifyOnSuccess) {
+    // 에러가 있거나 느린 응답이 있거나 성공 알림이 활성화된 경우만 전송
+    if (errorCount > 0 || (slowCount > 0 && CONFIG.notifyOnSlowResponse) || CONFIG.notifyOnSuccess) {
       // API별 상태 텍스트 생성
       const apiStatusText = results.map(r => {
-        const statusEmoji = r.status === 'success' ? '✅' : '❌';
+        const statusEmoji = r.status === 'success' ? (r.isSlow ? '⚠️' : '✅') : '❌';
         const timeInfo = r.status === 'success' ? ` (${r.responseTimeStr})` : '';
-        return `${statusEmoji} *${r.apiName}*: ${r.statusCode}${timeInfo}`;
+        const slowWarning = r.isSlow && r.status === 'success' ? ' 🐢' : '';
+        return `${statusEmoji} *${r.apiName}*: ${r.statusCode}${timeInfo}${slowWarning}`;
       }).join('\n');
 
       await webhook.send({
@@ -213,7 +229,7 @@ async function sendSummaryToSlack(results) {
             fields: [
               {
                 title: '전체 상태',
-                value: `총 ${totalCount}개 | 성공 ${successCount}개 | 실패 ${errorCount}개`,
+                value: `총 ${totalCount}개 | 성공 ${successCount}개 | 실패 ${errorCount}개${slowCount > 0 ? ` | 느림 ${slowCount}개` : ''}`,
                 short: false,
               },
               {
@@ -226,6 +242,14 @@ async function sendSummaryToSlack(results) {
                 value: results
                   .filter(r => r.status === 'error')
                   .map(r => `• ${r.apiName}: ${r.error}`)
+                  .join('\n'),
+                short: false,
+              }] : []),
+              ...(slowCount > 0 ? [{
+                title: '느린 응답 상세',
+                value: results
+                  .filter(r => r.status === 'success' && r.isSlow)
+                  .map(r => `• ${r.apiName}: ${r.responseTimeStr} (임계값: ${CONFIG.responseTimeThreshold}ms)`)
                   .join('\n'),
                 short: false,
               }] : []),
