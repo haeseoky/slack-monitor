@@ -4,7 +4,7 @@
 module.exports = [
   {
     id: 'monimo-api',
-    name: '모니모 API',
+    name: '모니모 API(inqrSvBasisPly)',
     url: 'https://api.monimo.com/restapi/cmn/ply/inqrSvBasisPly',
     method: 'POST',
     headers: {
@@ -15,10 +15,21 @@ module.exports = [
     enabled: true,
   },
   {
-    id: 'monimo-api-2',
-    name: '모니모 서버시간 API',
+    id: '원앱-api-1',
+    name: '원앱 서버시간 API(searchCrtlSvrDtm)',
     url: 'https://mapi.monimo.com/svc-common/sys/rsrc/v1/searchCrtlSvrDtm',
-    method: 'GET',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    timeout: 5000,
+    enabled: true,
+  },
+  {
+    id: '원앱-api-2',
+    name: '원앱 서버시간 API(searchSappBasPly)',
+    url: 'https://mapi.monimo.com/svc-common/sapp/basis/v1/searchSappBasPly',
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
