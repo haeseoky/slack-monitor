@@ -27,7 +27,7 @@ module.exports = [
   },
   {
     id: '원앱-api-2',
-    name: '원앱 서버시간 API(searchSappBasPly)',
+    name: '원앱 앱기본정책조회 API(searchSappBasPly)',
     url: 'https://mapi.monimo.com/svc-common/sapp/basis/v1/searchSappBasPly',
     method: 'POST',
     headers: {
