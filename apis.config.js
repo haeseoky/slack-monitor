@@ -14,6 +14,17 @@ module.exports = [
     timeout: 5000,
     enabled: true,
   },
+  {
+    id: 'monimo-api-2',
+    name: '모니모 서버시간 API',
+    url: 'https://mapi.monimo.com/svc-common/sys/rsrc/v1/searchCrtlSvrDtm',
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    timeout: 5000,
+    enabled: true,
+  },
   // 추가 API 예시 (필요시 주석 해제)
   /*
   {
