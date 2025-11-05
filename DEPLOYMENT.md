@@ -48,8 +48,16 @@ cd ~/slack-monitor
 **deploy.sh가 자동으로**:
 - ✅ Git pull로 최신 코드 가져오기
 - ✅ npm install로 패키지 업데이트
-- ✅ PM2 재시작
+- ✅ PM2 완전 재시작 (캐시 초기화)
 - ✅ 상태 확인
+
+**⚠️ 중요**:
+- `deploy.sh`는 `pm2 delete` + `pm2 start`를 사용합니다
+- Node.js 모듈 캐시를 완전히 초기화합니다
+- `apis.config.js` 같은 설정 파일 변경사항이 확실히 반영됩니다
+- 단순히 `pm2 restart`만 하면 변경사항이 반영되지 않을 수 있습니다
+
+**문제 발생 시**: [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) 참고
 
 ---
 

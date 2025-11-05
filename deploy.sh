@@ -27,8 +27,10 @@ fi
 # 4. PM2로 재시작
 echo "🔄 PM2 프로세스 재시작..."
 if pm2 list | grep -q "slack-monitor"; then
-    echo "기존 프로세스 재시작..."
-    pm2 restart slack-monitor
+    echo "기존 프로세스 삭제 및 재시작..."
+    # 완전히 삭제한 후 재시작 (캐시 초기화)
+    pm2 delete slack-monitor
+    pm2 start ecosystem.config.js
 else
     echo "새 프로세스 시작..."
     pm2 start ecosystem.config.js
