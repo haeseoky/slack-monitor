@@ -1,7 +1,7 @@
 module.exports = {
   apps: [{
     name: 'slack-monitor',
-    script: './slack-monitor.js',
+    script: './index.js',
     
     // 재시작 설정
     autorestart: true,
