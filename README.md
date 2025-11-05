@@ -47,6 +47,18 @@ pm2 status
 pm2 logs slack-monitor
 ```
 
+## 배포
+
+오라클 서버 등 프로덕션 환경에 배포하는 방법은 [DEPLOYMENT.md](./DEPLOYMENT.md)를 참고하세요.
+
+### 간단 배포
+```bash
+# 서버에서
+./deploy.sh
+```
+
+자세한 배포 방법 (자동 배포 포함): [DEPLOYMENT.md](./DEPLOYMENT.md)
+
 ## 주의사항
 
 ⚠️ **보안**: Slack Webhook URL은 민감한 정보입니다. 프로덕션 환경에서는 환경 변수로 관리하세요.
