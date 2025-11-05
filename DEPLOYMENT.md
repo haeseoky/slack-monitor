@@ -57,39 +57,68 @@ cd ~/slack-monitor
 
 GitHub에 푸시하면 자동으로 서버에 배포됩니다.
 
-### 1. GitHub Secrets 설정
+### ⚠️ 현재 상태: SSH 인증 실패
+
+GitHub Actions가 다음 에러로 실패했습니다:
+```
+ssh: handshake failed: ssh: unable to authenticate
+```
+
+**원인**: GitHub Secrets가 설정되지 않았습니다.
+
+### 해결 방법
+
+**상세 설정 가이드**: [GITHUB_SECRETS_SETUP.md](./GITHUB_SECRETS_SETUP.md) 참고
+
+#### 빠른 설정:
+
+**1. 서버에서 SSH 키 생성**
+```bash
+ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/github_actions_key -N ""
+cat ~/.ssh/github_actions_key.pub >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+```
+
+**2. GitHub Secrets 등록**
 
 GitHub 저장소 → Settings → Secrets and variables → Actions
 
-다음 Secrets 추가:
-- `ORACLE_HOST`: 서버 IP 또는 도메인
-- `ORACLE_USERNAME`: SSH 사용자명
-- `ORACLE_SSH_KEY`: SSH 개인키 (private key)
-- `ORACLE_PORT`: SSH 포트 (기본값: 22)
-- `DEPLOY_PATH`: 배포 경로 (예: `/home/user/slack-monitor`)
+| Secret 이름 | 값 | 필수 |
+|-------------|-----|------|
+| `ORACLE_HOST` | 서버 IP (예: 132.145.67.89) | ✅ |
+| `ORACLE_USERNAME` | SSH 사용자명 (예: ubuntu) | ✅ |
+| `ORACLE_SSH_KEY` | `cat ~/.ssh/github_actions_key` 출력 내용 전체 | ✅ |
+| `ORACLE_PORT` | SSH 포트 (기본값: 22) | ❌ |
+| `DEPLOY_PATH` | 배포 경로 (기본값: ~/slack-monitor) | ❌ |
 
-### 2. SSH 키 생성 (서버에서)
-
+**3. 서버 초기 설정 (1회만)**
 ```bash
-# 서버에서 SSH 키 생성
-ssh-keygen -t ed25519 -C "github-actions"
-
-# 공개키를 authorized_keys에 추가
-cat ~/.ssh/id_ed25519.pub >> ~/.ssh/authorized_keys
-
-# 개인키 출력 (GitHub Secrets에 등록)
-cat ~/.ssh/id_ed25519
+cd ~
+git clone https://github.com/haeseoky/slack-monitor.git
+cd slack-monitor
+npm install
+cp .env.example .env
+nano .env  # Webhook URL 설정
+pm2 start ecosystem.config.js
 ```
 
-### 3. 자동 배포 테스트
-
+**4. 자동 배포 테스트**
 ```bash
-git add .
-git commit -m "Test auto deployment"
 git push origin main
 ```
 
-GitHub Actions 탭에서 배포 진행 상황 확인 가능합니다.
+GitHub Actions 탭에서 배포 진행 상황을 확인할 수 있습니다.
+
+### 자동 배포 동작 방식
+
+- `main` 브랜치에 푸시 시 자동 실행
+- `.md` 파일만 변경된 경우는 배포 안함 (문서 업데이트)
+- SSH로 서버 접속 → `./deploy.sh` 실행
+- 배포 성공/실패 상태를 Actions 탭에서 확인
+
+### 수동 실행
+
+GitHub → Actions → Deploy to Oracle Server → Run workflow
 
 ---
 
