@@ -2,7 +2,7 @@
 // 각 API는 독립적으로 모니터링됩니다
 
 module.exports = [
-  {
+  /*{
     id: 'monimo-api',
     name: '모니모 API(inqrSvBasisPly)',
     url: 'https://api.monimo.com/restapi/cmn/ply/inqrSvBasisPly',
@@ -36,6 +36,7 @@ module.exports = [
     timeout: 5000,
     enabled: true,
   },
+  */
   // 추가 API 예시 (필요시 주석 해제)
   /*
   {
