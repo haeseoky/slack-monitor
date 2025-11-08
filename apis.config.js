@@ -13,6 +13,7 @@ module.exports = [
     body: {},
     timeout: 5000,
     enabled: true,
+    channel: 'health', // 알림을 받을 채널 (SLACK_WEBHOOK_URLS에서 정의된 채널명)
   },
   {
     id: '원앱-api-1',
@@ -24,6 +25,7 @@ module.exports = [
     },
     timeout: 5000,
     enabled: true,
+    channel: 'health', // 알림을 받을 채널
   },
   {
     id: '원앱-api-2',
@@ -36,6 +38,7 @@ module.exports = [
     body: {'mblOsDvC':'01', 'apstDvC':'2',},
     timeout: 5000,
     enabled: true,
+    channel: 'health', // 알림을 받을 채널
   },
 
   // 추가 API 예시 (필요시 주석 해제)

@@ -4,12 +4,37 @@
  */
 
 const { IncomingWebhook } = require('@slack/webhook');
-const { config } = require('../config');
+const { config, getWebhookUrl } = require('../config');
 const { calculateStats, API_STATUS } = require('./apiChecker');
 const logger = require('../utils/logger');
 
-// Slack Webhook 초기화
-const webhook = new IncomingWebhook(config.slack.webhookUrl);
+// 채널별 Webhook 인스턴스 캐시
+const webhookCache = new Map();
+
+/**
+ * 채널에 해당하는 Webhook 인스턴스 가져오기
+ * @param {string} channel - 채널명
+ * @returns {IncomingWebhook|null}
+ */
+function getWebhook(channel) {
+  const webhookUrl = getWebhookUrl(channel);
+
+  if (!webhookUrl) {
+    logger.error(`웹훅 URL을 찾을 수 없습니다: ${channel}`);
+    return null;
+  }
+
+  // 캐시에 있으면 재사용
+  if (webhookCache.has(webhookUrl)) {
+    return webhookCache.get(webhookUrl);
+  }
+
+  // 새로운 Webhook 인스턴스 생성 및 캐시
+  const webhook = new IncomingWebhook(webhookUrl);
+  webhookCache.set(webhookUrl, webhook);
+
+  return webhook;
+}
 
 const NOTIFICATION_COLORS = {
   SUCCESS: 'good',
@@ -107,23 +132,30 @@ function createResultFields(result) {
  */
 async function sendIndividualNotification(result) {
   try {
+    const channel = result.channel || config.slack.defaultChannel;
+    const webhook = getWebhook(channel);
+
+    if (!webhook) {
+      logger.error(`알림 전송 실패: 웹훅을 찾을 수 없습니다 (채널: ${channel})`);
+      return;
+    }
+
     const color = getNotificationColor(result);
     const emoji = getNotificationEmoji(result);
 
     await webhook.send({
       text: `${emoji} [${result.apiName}] API 모니터링 결과`,
-      channel: config.slack.channel,
       attachments: [
         {
           color,
           fields: createResultFields(result),
-          footer: 'API Monitor',
+          footer: `API Monitor | Channel: #${channel}`,
           ts: Math.floor(Date.now() / 1000),
         },
       ],
     });
 
-    logger.success(`슬랙 알림 전송 완료: ${result.apiName}`);
+    logger.success(`슬랙 알림 전송 완료: ${result.apiName} → #${channel}`);
   } catch (error) {
     logger.error('슬랙 전송 실패', error);
   }
@@ -220,10 +252,46 @@ function createSummaryFields(results, stats) {
 }
 
 /**
- * 요약 알림 전송
+ * 요약 알림 전송 (채널별로 그룹화)
  */
 async function sendSummaryNotification(results) {
   try {
+    // 채널별로 결과 그룹화
+    const resultsByChannel = new Map();
+
+    for (const result of results) {
+      const channel = result.channel || config.slack.defaultChannel;
+
+      if (!resultsByChannel.has(channel)) {
+        resultsByChannel.set(channel, []);
+      }
+
+      resultsByChannel.get(channel).push(result);
+    }
+
+    // 각 채널별로 요약 알림 전송
+    for (const [channel, channelResults] of resultsByChannel.entries()) {
+      await sendChannelSummary(channel, channelResults);
+    }
+
+    logger.success('슬랙 요약 알림 전송 완료 (모든 채널)');
+  } catch (error) {
+    logger.error('슬랙 전송 실패', error);
+  }
+}
+
+/**
+ * 특정 채널에 요약 알림 전송
+ */
+async function sendChannelSummary(channel, results) {
+  try {
+    const webhook = getWebhook(channel);
+
+    if (!webhook) {
+      logger.error(`요약 알림 전송 실패: 웹훅을 찾을 수 없습니다 (채널: ${channel})`);
+      return;
+    }
+
     const stats = calculateStats(results);
     const overallStatus = determineOverallStatus(stats);
 
@@ -241,21 +309,20 @@ async function sendSummaryNotification(results) {
     const color = NOTIFICATION_COLORS[overallStatus];
 
     await webhook.send({
-      text: `${emoji} API 모니터링 요약`,
-      channel: config.slack.channel,
+      text: `${emoji} API 모니터링 요약 (#${channel})`,
       attachments: [
         {
           color,
           fields: createSummaryFields(results, stats),
-          footer: `API Monitor | ${new Date().toLocaleString('ko-KR')}`,
+          footer: `API Monitor | Channel: #${channel} | ${new Date().toLocaleString('ko-KR')}`,
           ts: Math.floor(Date.now() / 1000),
         },
       ],
     });
 
-    logger.success('슬랙 요약 알림 전송 완료');
+    logger.success(`슬랙 요약 알림 전송 완료: #${channel}`);
   } catch (error) {
-    logger.error('슬랙 전송 실패', error);
+    logger.error(`슬랙 전송 실패 (#${channel})`, error);
   }
 }
 

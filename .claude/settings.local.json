@@ -9,7 +9,10 @@
       "Bash(npm install:*)",
       "Bash(node -e:*)",
       "Bash(chmod:*)",
-      "Bash(timeout 10 node:*)"
+      "Bash(timeout 10 node:*)",
+      "Bash(node:*)",
+      "Bash(node -c:*)",
+      "Bash(npm test)"
     ],
     "deny": [],
     "ask": []

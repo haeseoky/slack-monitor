@@ -5,9 +5,10 @@
 ## 주요 기능
 
 - ✅ **다중 API 모니터링**: 여러 API를 동시에 체크 (병렬 실행)
+- 📢 **멀티 채널 지원**: 2개 이상의 Slack 채널에 알림 전송 가능
+- 🎯 **채널별 API 매핑**: API마다 다른 채널로 알림 전송 가능
 - ⏱️ **응답 시간 측정**: 각 API의 응답 시간 추적
-- 📊 **요약 알림**: 여러 API 결과를 한 번에 Slack으로 전송
-- 🎯 **개별 알림**: API별로 개별 알림도 가능
+- 📊 **요약 알림**: 채널별로 그룹화된 API 결과 요약 전송
 - 🔧 **유연한 설정**: GET/POST/PUT/PATCH 등 다양한 HTTP 메서드 지원
 - 🚀 **PM2 지원**: 백그라운드 실행 및 자동 재시작
 
@@ -31,12 +32,21 @@ cp .env.example .env
 
 | 환경 변수 | 설명 | 기본값 |
 |-----------|------|--------|
-| `SLACK_WEBHOOK_URL` | Slack Webhook URL (필수) | - |
-| `SLACK_CHANNEL` | Slack 채널 | `#ocean` |
+| `SLACK_WEBHOOK_URLS` | 채널별 Webhook URLs (필수) | - |
+| `SLACK_DEFAULT_CHANNEL` | 기본 Slack 채널 | `health` |
 | `CHECK_INTERVAL` | 체크 간격 (밀리초) | `60000` (1분) |
 | `NOTIFY_ON_ERROR` | 에러 시 알림 여부 | `true` |
 | `NOTIFY_ON_SUCCESS` | 성공 시 알림 여부 | `false` |
 | `SEND_SUMMARY` | 요약 알림 전송 | `true` |
+
+**SLACK_WEBHOOK_URLS 형식:**
+```bash
+# 단일 채널
+SLACK_WEBHOOK_URLS=health=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+
+# 다중 채널 (쉼표로 구분)
+SLACK_WEBHOOK_URLS=health=https://hooks.slack.com/services/..., ocean=https://hooks.slack.com/services/..., alerts=https://hooks.slack.com/services/...
+```
 
 ### 2. API 목록 설정
 
@@ -55,12 +65,13 @@ module.exports = [
     body: {},                       // 요청 Body (POST/PUT/PATCH용, 선택)
     timeout: 5000,                  // 타임아웃 (밀리초)
     enabled: true,                  // 활성화 여부
+    channel: 'health',              // 알림 받을 채널명 (선택, 미지정 시 SLACK_DEFAULT_CHANNEL 사용)
   },
   // 추가 API들...
 ];
 ```
 
-**예시: 여러 API 모니터링**
+**예시: 채널별 API 모니터링**
 
 ```javascript
 module.exports = [
@@ -70,6 +81,7 @@ module.exports = [
     url: 'https://api.example.com/health',
     method: 'GET',
     enabled: true,
+    channel: 'health',  // #health 채널로 알림 전송
   },
   {
     id: 'payment-api',
@@ -81,6 +93,15 @@ module.exports = [
     },
     body: { service: 'payment' },
     enabled: true,
+    channel: 'alerts',  // #alerts 채널로 알림 전송
+  },
+  {
+    id: 'user-api',
+    name: '사용자 API',
+    url: 'https://user.example.com/ping',
+    method: 'GET',
+    enabled: true,
+    channel: 'ocean',   // #ocean 채널로 알림 전송
   },
   {
     id: 'legacy-api',
@@ -91,6 +112,11 @@ module.exports = [
   },
 ];
 ```
+
+**채널 매핑:**
+- 각 API의 `channel` 속성은 `.env` 파일의 `SLACK_WEBHOOK_URLS`에 정의된 채널명과 일치해야 합니다
+- `channel`을 지정하지 않으면 `SLACK_DEFAULT_CHANNEL`로 알림이 전송됩니다
+- 요약 알림(`SEND_SUMMARY=true`)을 사용하면 채널별로 그룹화된 요약이 전송됩니다
 
 ## 실행
 

@@ -60,6 +60,7 @@ function createSuccessResult(apiConfig, responseTime, statusCode) {
     responseTime,
     responseTimeStr: `${responseTime}ms`,
     isSlow,
+    channel: apiConfig.channel, // 채널 정보 추가
     timestamp: new Date().toISOString(),
   };
 }
@@ -78,6 +79,7 @@ function createErrorResult(apiConfig, error) {
     status: API_STATUS.ERROR,
     error: error.message,
     statusCode: error.response?.status || 'N/A',
+    channel: apiConfig.channel, // 채널 정보 추가
     timestamp: new Date().toISOString(),
   };
 }
