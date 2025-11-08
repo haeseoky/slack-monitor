@@ -9,9 +9,16 @@ echo "========================================="
 echo "Slack Monitor 배포 시작"
 echo "========================================="
 
-# 1. Git Pull
-echo "📥 최신 코드 가져오기..."
-git pull origin main
+# 1. Git 강제 동기화
+echo "📥 원격 저장소의 최신 코드로 강제 동기화..."
+# 원격 저장소 최신 정보 가져오기
+git fetch origin
+
+# 로컬 변경사항을 모두 버리고 원격 저장소의 main 브랜치와 강제 동기화
+git reset --hard origin/main
+
+# .env와 node_modules를 제외하고 추적되지 않는 파일/디렉토리 정리
+git clean -fd -e .env -e node_modules
 
 # 2. 의존성 설치
 echo "📦 npm 패키지 설치..."
