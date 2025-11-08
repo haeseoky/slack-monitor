@@ -46,14 +46,16 @@ cd ~/slack-monitor
 ```
 
 **deploy.sh가 자동으로**:
-- ✅ Git pull로 최신 코드 가져오기
+- ✅ 로컬 변경사항 자동 처리 (충돌 해결)
+- ✅ Git에서 최신 코드 가져오기
 - ✅ npm install로 패키지 업데이트
 - ✅ PM2 완전 재시작 (캐시 초기화)
 - ✅ 상태 확인
 
 **⚠️ 중요**:
-- `deploy.sh`는 `pm2 delete` + `pm2 start`를 사용합니다
-- Node.js 모듈 캐시를 완전히 초기화합니다
+- `deploy.sh`는 로컬 변경사항을 **자동으로 처리**합니다
+- `.env` 파일과 `.ppomppu-last-check.json`은 보존됩니다
+- `pm2 delete` + `pm2 start`로 Node.js 모듈 캐시를 완전히 초기화합니다
 - `apis.config.js` 같은 설정 파일 변경사항이 확실히 반영됩니다
 - 단순히 `pm2 restart`만 하면 변경사항이 반영되지 않을 수 있습니다
 
@@ -188,10 +190,15 @@ pm2 delete 기존프로세스명
 ```
 
 ### Git pull 충돌
+**해결됨**: `deploy.sh`가 자동으로 처리합니다.
+
+수동으로 해결하려면:
 ```bash
-git stash  # 로컬 변경사항 임시 저장
-git pull origin main
+git fetch origin main
+git reset --hard origin/main  # 로컬 변경사항 버리고 원격 저장소 코드로 강제 동기화
 ```
+
+**주의**: `.env` 파일과 뽐뿌 모니터링 상태 파일은 자동으로 보존됩니다.
 
 ---
 
