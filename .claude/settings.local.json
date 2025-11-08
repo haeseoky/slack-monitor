@@ -12,8 +12,7 @@
       "Bash(timeout 10 node:*)",
       "Bash(node:*)",
       "Bash(node -c:*)",
-      "Bash(npm test)",
-      "Bash(bash:*)"
+      "Bash(npm test)"
     ],
     "deny": [],
     "ask": []
