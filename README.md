@@ -7,6 +7,7 @@
 - ✅ **다중 API 모니터링**: 여러 API를 동시에 체크 (병렬 실행)
 - 📢 **멀티 채널 지원**: 2개 이상의 Slack 채널에 알림 전송 가능
 - 🎯 **채널별 API 매핑**: API마다 다른 채널로 알림 전송 가능
+- 🆕 **뽐뿌 게시글 모니터링**: 뽐뿌 신규 게시글 자동 감지 및 알림
 - ⏱️ **응답 시간 측정**: 각 API의 응답 시간 추적
 - 📊 **요약 알림**: 채널별로 그룹화된 API 결과 요약 전송
 - 🔧 **유연한 설정**: GET/POST/PUT/PATCH 등 다양한 HTTP 메서드 지원
@@ -34,10 +35,12 @@ cp .env.example .env
 |-----------|------|--------|
 | `SLACK_WEBHOOK_URLS` | 채널별 Webhook URLs (필수) | - |
 | `SLACK_DEFAULT_CHANNEL` | 기본 Slack 채널 | `health` |
-| `CHECK_INTERVAL` | 체크 간격 (밀리초) | `60000` (1분) |
+| `CHECK_INTERVAL` | API 체크 간격 (밀리초) | `60000` (1분) |
 | `NOTIFY_ON_ERROR` | 에러 시 알림 여부 | `true` |
 | `NOTIFY_ON_SUCCESS` | 성공 시 알림 여부 | `false` |
 | `SEND_SUMMARY` | 요약 알림 전송 | `true` |
+| `PPOMPPU_MONITOR_ENABLED` | 뽐뿌 모니터링 활성화 | `true` |
+| `PPOMPPU_CHECK_INTERVAL` | 뽐뿌 체크 간격 (밀리초) | `60000` (1분) |
 
 **SLACK_WEBHOOK_URLS 형식:**
 ```bash
@@ -45,8 +48,15 @@ cp .env.example .env
 SLACK_WEBHOOK_URLS=health=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
 
 # 다중 채널 (쉼표로 구분)
-SLACK_WEBHOOK_URLS=health=https://hooks.slack.com/services/..., ocean=https://hooks.slack.com/services/..., alerts=https://hooks.slack.com/services/...
+SLACK_WEBHOOK_URLS=health=https://hooks.slack.com/services/..., ocean=https://hooks.slack.com/services/..., ppomppu=https://hooks.slack.com/services/...
 ```
+
+**뽐뿌 모니터링 설정:**
+- `ppomppu` 채널을 `SLACK_WEBHOOK_URLS`에 추가해야 뽐뿌 알림이 전송됩니다
+- `PPOMPPU_MONITOR_ENABLED=false`로 설정하면 뽐뿌 모니터링을 비활성화할 수 있습니다
+- 첫 실행 시에는 현재 게시글만 기록하고 알림을 보내지 않습니다
+- 이후 실행부터 신규 게시글을 감지하여 알림을 전송합니다
+- **인기글(hotpop_bg_color) 자동 제외**: 랜덤으로 표시되는 인기글은 신규 게시글로 감지하지 않습니다
 
 ### 2. API 목록 설정
 
@@ -125,6 +135,10 @@ module.exports = [
 node index.js
 ```
 
+실행 시 다음 모니터링이 시작됩니다:
+- API 모니터링 (설정된 간격으로)
+- 뽐뿌 게시글 모니터링 (활성화된 경우)
+
 ### PM2로 실행
 ```bash
 pm2 start ecosystem.config.js
@@ -134,6 +148,12 @@ pm2 start ecosystem.config.js
 ```bash
 pm2 status
 pm2 logs slack-monitor
+```
+
+### 뽐뿌 모니터링 비활성화
+뽐뿌 모니터링만 비활성화하려면 `.env` 파일에서:
+```bash
+PPOMPPU_MONITOR_ENABLED=false
 ```
 
 ## 배포

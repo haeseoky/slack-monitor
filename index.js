@@ -7,8 +7,12 @@
 
 const { config, validateConfig } = require('./src/config');
 const { startMonitoring, setupGracefulShutdown } = require('./src/services/monitoringService');
+const { startPpomppuMonitoring, stopPpomppuMonitoring } = require('./src/services/ppomppuMonitor');
 const apiConfigs = require('./apis.config');
 const logger = require('./src/utils/logger');
+
+// 모니터링 인스턴스 저장
+let ppomppuIntervalId = null;
 
 /**
  * 애플리케이션 초기화
@@ -33,7 +37,32 @@ function initialize() {
 async function main() {
   try {
     initialize();
+
+    // API 모니터링 시작
     await startMonitoring(apiConfigs);
+
+    // 뽐뿌 모니터링 시작 (활성화된 경우)
+    if (config.ppomppu.enabled) {
+      ppomppuIntervalId = startPpomppuMonitoring(config.ppomppu.checkInterval);
+
+      // Graceful shutdown에 뽐뿌 모니터링 중지 추가
+      const originalHandlers = process.listeners('SIGTERM').concat(process.listeners('SIGINT'));
+      process.removeAllListeners('SIGTERM');
+      process.removeAllListeners('SIGINT');
+
+      const shutdownHandler = () => {
+        logger.info('종료 신호 수신. 뽐뿌 모니터링을 정리합니다...');
+        stopPpomppuMonitoring(ppomppuIntervalId);
+
+        // 기존 핸들러 실행
+        originalHandlers.forEach((handler) => handler());
+      };
+
+      process.on('SIGTERM', shutdownHandler);
+      process.on('SIGINT', shutdownHandler);
+    } else {
+      logger.info('뽐뿌 모니터링이 비활성화되어 있습니다');
+    }
   } catch (error) {
     logger.error('애플리케이션 시작 실패', error);
     process.exit(1);

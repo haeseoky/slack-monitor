@@ -52,6 +52,11 @@ const config = {
     onSlowResponse: process.env.NOTIFY_ON_SLOW_RESPONSE !== 'false',
     sendSummary: process.env.SEND_SUMMARY !== 'false',
   },
+
+  ppomppu: {
+    enabled: process.env.PPOMPPU_MONITOR_ENABLED !== 'false',
+    checkInterval: parseInt(process.env.PPOMPPU_CHECK_INTERVAL, 10) || 60000,
+  },
 };
 
 /**
