@@ -274,7 +274,7 @@ node -e "const apis = require('./apis.config'); console.log('✓ OK:', apis.leng
 특정 API만 테스트:
 
 ```bash
-# slack-monitor.js를 잠시 실행하여 확인
-node slack-monitor.js
+# index.js를 잠시 실행하여 확인
+node index.js
 # Ctrl+C로 중단
 ```

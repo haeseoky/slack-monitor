@@ -19,7 +19,6 @@ slack-monitor/
 │   │   └── monitoringService.js # 모니터링 오케스트레이션
 │   └── utils/
 │       └── logger.js            # 로깅 유틸리티
-└── slack-monitor.js.old         # 레거시 코드 (백업)
 ```
 
 ## 모듈 설명

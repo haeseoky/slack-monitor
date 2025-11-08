@@ -2,13 +2,13 @@
 
 ## Project Overview
 
-This project is a Node.js-based API monitoring tool. It periodically checks the health of multiple APIs, measures their response times, and sends consolidated reports to a specified Slack channel. The application is designed for continuous background operation using PM2, making it suitable for production environments.
+This project is a Node.js-based API monitoring tool. It periodically checks the health of multiple APIs, measures their response times, and sends consolidated reports to a specified Slack channel. The application is designed for continuous background operation using PM2, making it suitable for production environments. It also supports multi-channel notifications, allowing different APIs to report to different Slack channels.
 
 **Key Technologies:**
 
 *   **Runtime:** Node.js
 *   **HTTP Client:** Axios
-*   **Slack Integration:** @slack/webhook
+*   **Slack Integration:** [@slack/webhook](https://www.npmjs.com/package/@slack/webhook)
 *   **Process Management:** PM2
 *   **Configuration:** `apis.config.js` for API endpoints and `.env` for environment variables.
 

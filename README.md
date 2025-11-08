@@ -122,7 +122,7 @@ module.exports = [
 
 ### 일반 실행
 ```bash
-node slack-monitor.js
+node index.js
 ```
 
 ### PM2로 실행
