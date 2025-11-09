@@ -58,6 +58,12 @@ SLACK_WEBHOOK_URLS=health=https://hooks.slack.com/services/..., ocean=https://ho
 - 이후 실행부터 신규 게시글을 감지하여 알림을 전송합니다
 - **인기글(hotpop_bg_color) 자동 제외**: 랜덤으로 표시되는 인기글은 신규 게시글로 감지하지 않습니다
 
+**뽐뿌 알림 내용:**
+- ✅ 제목
+- ✅ 링크 (게시글 바로가기)
+- ✅ 썸네일 이미지
+- ✅ 게시글 번호 (footer)
+
 ### 2. API 목록 설정
 
 `apis.config.js` 파일에서 모니터링할 API를 설정하세요:

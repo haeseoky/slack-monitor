@@ -95,6 +95,19 @@ async function fetchPosts() {
         // 조회수 (TD[5])
         const hit = $(tds[5]).text().trim();
 
+        // 썸네일 이미지 (TD[1]에 있음)
+        const thumbImg = $(tds[1]).find('img').first();
+        let imageUrl = '';
+        if (thumbImg.length > 0) {
+          const imgSrc = thumbImg.attr('src');
+          if (imgSrc) {
+            // 상대 경로를 절대 경로로 변환 (//로 시작하는 경우 https: 추가)
+            imageUrl = imgSrc.startsWith('http')
+              ? imgSrc
+              : `https:${imgSrc}`;
+          }
+        }
+
         if (postId && title && link) {
           // 상대 경로를 절대 경로로 변환
           const fullLink = link.startsWith('http')
@@ -109,6 +122,7 @@ async function fetchPosts() {
             date,
             hit,
             recommend,
+            imageUrl,
           });
         }
       }
@@ -147,48 +161,29 @@ async function notifyNewPost(post) {
         value: post.title,
         short: false,
       },
-      // {
-      //   title: '작성자',
-      //   value: post.author || 'N/A',
-      //   short: true,
-      // },
       {
-        title: '날짜',
-        value: post.date || 'N/A',
-        short: true,
-      },
-      {
-        title: '조회수',
-        value: post.hit || 'N/A',
-        short: true,
+        title: '링크',
+        value: `<${post.link}|게시글 보기>`,
+        short: false,
       },
     ];
 
-    // // 추천수가 있으면 추가
-    // if (post.recommend) {
-    //   fields.push({
-    //     title: '추천수',
-    //     value: post.recommend,
-    //     short: true,
-    //   });
-    // }
+    const attachment = {
+      color: '#36a64f',
+      fields,
+      footer: `뽐뿌 모니터 | 게시글 번호: ${post.postId}`,
+      ts: Math.floor(Date.now() / 1000),
+    };
 
-    fields.push({
-      title: '링크',
-      value: `<${post.link}|게시글 보기>`,
-      short: false,
-    });
+    // 썸네일 이미지가 있으면 추가
+    if (post.imageUrl) {
+      attachment.image_url = post.imageUrl;
+    }
 
     await webhook.send({
       text: `🆕 뽐뿌 신규 게시글`,
-      attachments: [
-        {
-          color: '#36a64f',
-          fields,
-          footer: `뽐뿌 모니터 | 게시글 번호: ${post.postId}`,
-          ts: Math.floor(Date.now() / 1000),
-        },
-      ],
+      channel: '#ppomppu',
+      attachments: [attachment],
     });
 
     logger.success(`뽐뿌 신규 게시글 알림 전송 완료: ${post.title}`);
