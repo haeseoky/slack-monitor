@@ -14,8 +14,8 @@ module.exports = [
     timeout: 5000,
     enabled: true,
     channel: 'health', // 알림을 받을 채널 (SLACK_WEBHOOK_URLS에서 정의된 채널명)
-    checkInterval: 60000, // 체크 간격 (밀리초, 선택) - 미지정 시 .env의 CHECK_INTERVAL 사용
-    responseTimeThreshold: 1000, // 응답 시간 임계값 (밀리초, 선택) - 미지정 시 .env의 RESPONSE_TIME_THRESHOLD 사용
+    checkInterval: 1000, // 체크 간격 (밀리초, 선택) - 미지정 시 .env의 CHECK_INTERVAL 사용
+    responseTimeThreshold: 100, // 응답 시간 임계값 (밀리초, 선택) - 미지정 시 .env의 RESPONSE_TIME_THRESHOLD 사용
   },
   {
     id: '원앱-api-1',
@@ -28,8 +28,8 @@ module.exports = [
     timeout: 5000,
     enabled: true,
     channel: 'health', // 알림을 받을 채널
-    checkInterval: 30000, // 30초마다 체크
-    responseTimeThreshold: 500, // 500ms 초과 시 느림 경고
+    checkInterval: 1000, // 30초마다 체크
+    responseTimeThreshold: 100, // 500ms 초과 시 느림 경고
   },
   {
     id: '원앱-api-2',
@@ -43,6 +43,8 @@ module.exports = [
     timeout: 5000,
     enabled: true,
     channel: 'health', // 알림을 받을 채널
+    checkInterval: 1000, // 10초마다 체크
+    responseTimeThreshold: 200, // 200ms 초과 시 느림 경고
     // checkInterval과 responseTimeThreshold를 지정하지 않으면 .env 기본값 사용
   },
 
