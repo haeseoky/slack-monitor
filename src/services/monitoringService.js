@@ -3,10 +3,13 @@
  * API 체크와 알림 전송을 조율합니다.
  */
 
-const { checkApis, calculateStats } = require('./apiChecker');
-const { notify } = require('./slackNotifier');
+const { checkApi, checkApis, calculateStats } = require('./apiChecker');
+const { notify, sendIndividualNotification } = require('./slackNotifier');
 const logger = require('../utils/logger');
 const { config } = require('../config');
+
+// API별 타이머 저장
+const apiTimers = new Map();
 
 /**
  * 체크 결과 로그 출력
@@ -53,16 +56,34 @@ function logMonitoringStart(apiConfigs) {
   logger.info(`📋 모니터링 API 개수: ${enabledApis.length}개`);
 
   enabledApis.forEach((api, index) => {
-    logger.info(`   ${index + 1}. ${api.name} (${api.method} ${api.url})`);
+    const interval = api.checkInterval || config.monitoring.checkInterval;
+    const threshold = api.responseTimeThreshold || config.monitoring.responseTimeThreshold;
+    logger.info(
+      `   ${index + 1}. ${api.name} (${api.method} ${api.url}) - 체크: ${interval / 1000}초, 임계값: ${threshold}ms`
+    );
   });
 
-  logger.info(
-    `⏱️  체크 간격: ${config.monitoring.checkInterval}ms (${
-      config.monitoring.checkInterval / 1000
-    }초)`
-  );
   logger.info(`📢 알림 방식: ${config.notifications.sendSummary ? '요약' : '개별'}`);
   logger.separator();
+}
+
+/**
+ * 단일 API 체크 및 알림
+ */
+async function checkAndNotifySingleApi(apiConfig) {
+  try {
+    const result = await checkApi(apiConfig);
+
+    // 개별 알림 또는 결과 저장
+    if (!config.notifications.sendSummary) {
+      await sendIndividualNotification(result);
+    }
+
+    return result;
+  } catch (error) {
+    logger.error(`[${apiConfig.name}] 모니터링 실행 중 오류 발생`, error);
+    return null;
+  }
 }
 
 /**
@@ -78,28 +99,59 @@ async function startMonitoring(apiConfigs) {
 
   logMonitoringStart(enabledApis);
 
-  // 초기 체크
-  await checkAndNotify(enabledApis);
-
-  // 주기적 체크
-  setInterval(async () => {
+  // 요약 알림 사용 시 전체 API를 함께 체크
+  if (config.notifications.sendSummary) {
+    // 초기 체크
     await checkAndNotify(enabledApis);
-  }, config.monitoring.checkInterval);
+
+    // 주기적 체크 (최소 checkInterval 사용)
+    const intervals = enabledApis.map(api => api.checkInterval || config.monitoring.checkInterval);
+    const minInterval = Math.min(...intervals);
+
+    setInterval(async () => {
+      await checkAndNotify(enabledApis);
+    }, minInterval);
+  } else {
+    // 개별 알림 사용 시 API별로 독립적인 타이머 생성
+    enabledApis.forEach(async (apiConfig) => {
+      const interval = apiConfig.checkInterval || config.monitoring.checkInterval;
+
+      // 초기 체크
+      await checkAndNotifySingleApi(apiConfig);
+
+      // 주기적 체크
+      const timerId = setInterval(async () => {
+        await checkAndNotifySingleApi(apiConfig);
+      }, interval);
+
+      apiTimers.set(apiConfig.id, timerId);
+      logger.info(`[${apiConfig.name}] 모니터링 타이머 시작 (간격: ${interval / 1000}초)`);
+    });
+  }
 }
 
 /**
  * 모니터링 종료 처리
  */
 function setupGracefulShutdown() {
-  process.on('SIGINT', () => {
+  const shutdown = () => {
     logger.info('👋 모니터링 종료');
-    process.exit(0);
-  });
 
-  process.on('SIGTERM', () => {
-    logger.info('👋 모니터링 종료');
+    // 모든 API 타이머 정리
+    if (apiTimers.size > 0) {
+      logger.info('타이머 정리 중...');
+      apiTimers.forEach((timerId, apiId) => {
+        clearInterval(timerId);
+        logger.info(`[${apiId}] 타이머 종료`);
+      });
+      apiTimers.clear();
+    }
+
     process.exit(0);
-  });
+  };
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }
 
 module.exports = {

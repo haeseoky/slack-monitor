@@ -35,17 +35,18 @@ function createRequestConfig(apiConfig) {
 /**
  * 응답 시간이 느린지 확인
  */
-function isSlowResponse(responseTime) {
-  return responseTime > config.monitoring.responseTimeThreshold;
+function isSlowResponse(responseTime, threshold) {
+  return responseTime > threshold;
 }
 
 /**
  * 성공 결과 생성
  */
 function createSuccessResult(apiConfig, responseTime, statusCode) {
-  const isSlow = isSlowResponse(responseTime);
+  const threshold = apiConfig.responseTimeThreshold || config.monitoring.responseTimeThreshold;
+  const isSlow = isSlowResponse(responseTime, threshold);
   const slowWarning = isSlow
-    ? ` ⚠️ 느림 (임계값: ${config.monitoring.responseTimeThreshold}ms)`
+    ? ` ⚠️ 느림 (임계값: ${threshold}ms)`
     : '';
 
   logger.success(`[${apiConfig.name}] 체크 성공 - 응답시간: ${responseTime}ms${slowWarning}`);
