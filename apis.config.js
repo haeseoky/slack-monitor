@@ -39,7 +39,7 @@ module.exports = [
     headers: {
       'Content-Type': 'application/json',
     },
-    body: {'mblOsDvC':'01', 'apstDvC':'2',},
+    body: {'mblOsDvC':'01', 'apstDvC':'2','mblDvcDrmNo': '1234567890'},
     timeout: 5000,
     enabled: true,
     channel: 'health', // 알림을 받을 채널
