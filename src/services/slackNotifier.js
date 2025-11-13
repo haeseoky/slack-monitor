@@ -98,7 +98,7 @@ function createResultFields(result) {
       title: 'Response Time',
       value: result.responseTimeStr
         ? result.isSlow
-          ? `⚠️ ${result.responseTimeStr} (임계값: ${config.monitoring.responseTimeThreshold}ms 초과)`
+          ? `⚠️ ${result.responseTimeStr} (임계값: ${result.threshold || config.monitoring.responseTimeThreshold}ms 초과)`
           : result.responseTimeStr
         : 'N/A',
       short: true,
@@ -237,7 +237,7 @@ function createSummaryFields(results, stats) {
       .filter((r) => r.status === API_STATUS.SUCCESS && r.isSlow)
       .map(
         (r) =>
-          `• ${r.apiName}: ${r.responseTimeStr} (임계값: ${config.monitoring.responseTimeThreshold}ms)`
+          `• ${r.apiName}: ${r.responseTimeStr} (임계값: ${r.threshold || config.monitoring.responseTimeThreshold}ms)`
       )
       .join('\n');
 

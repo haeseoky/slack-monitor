@@ -61,6 +61,7 @@ function createSuccessResult(apiConfig, responseTime, statusCode) {
     responseTime,
     responseTimeStr: `${responseTime}ms`,
     isSlow,
+    threshold, // API별 임계값 추가
     channel: apiConfig.channel, // 채널 정보 추가
     timestamp: new Date().toISOString(),
   };
