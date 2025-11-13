@@ -78,51 +78,61 @@ function getNotificationEmoji(result) {
  * 개별 API 결과 필드 생성
  */
 function createResultFields(result) {
+  const statusEmoji = result.status === API_STATUS.SUCCESS ? '✅' : '❌';
+  const statusText = result.status === API_STATUS.SUCCESS ? '정상' : '실패';
+
   const fields = [
     {
-      title: 'API',
-      value: result.apiName,
-      short: true,
-    },
-    {
-      title: 'Status',
-      value: result.status.toUpperCase(),
-      short: true,
-    },
-    {
-      title: 'Status Code',
-      value: String(result.statusCode),
-      short: true,
-    },
-    {
-      title: 'Response Time',
-      value: result.responseTimeStr
-        ? result.isSlow
-          ? `⚠️ ${result.responseTimeStr} (임계값: ${result.threshold || config.monitoring.responseTimeThreshold}ms 초과)`
-          : result.responseTimeStr
-        : 'N/A',
-      short: true,
-    },
-    {
-      title: 'Method',
-      value: result.method,
-      short: true,
-    },
-    {
-      title: 'URL',
-      value: result.url,
+      title: '📌 API 이름',
+      value: `*${result.apiName}*`,
       short: false,
     },
+    {
+      title: '🔍 상태',
+      value: `${statusEmoji} ${statusText}`,
+      short: true,
+    },
+    {
+      title: '📊 응답 코드',
+      value: `\`${result.statusCode}\``,
+      short: true,
+    },
   ];
+
+  // 성공인 경우 응답시간 추가
+  if (result.status === API_STATUS.SUCCESS && result.responseTimeStr) {
+    const speedEmoji = result.isSlow ? '🐢' : '⚡';
+    const speedText = result.isSlow
+      ? `${result.responseTimeStr} (임계값: ${result.threshold || config.monitoring.responseTimeThreshold}ms)`
+      : result.responseTimeStr;
+
+    fields.push({
+      title: '⏱️ 응답시간',
+      value: `${speedEmoji} ${speedText}`,
+      short: true,
+    });
+  }
+
+  fields.push({
+    title: '🔗 메서드',
+    value: `\`${result.method}\``,
+    short: true,
+  });
 
   // 에러 정보 추가
   if (result.error) {
     fields.push({
-      title: 'Error',
-      value: result.error,
+      title: '❗ 오류 상세',
+      value: `\`\`\`${result.error}\`\`\``,
       short: false,
     });
   }
+
+  fields.push({
+    title: '🌐 URL',
+    value: `\`${result.url}\``,
+    short: false,
+  });
 
   return fields;
 }
@@ -143,13 +153,24 @@ async function sendIndividualNotification(result) {
     const color = getNotificationColor(result);
     const emoji = getNotificationEmoji(result);
 
+    // 상태에 따른 메시지 텍스트
+    let statusText;
+    if (result.status === API_STATUS.ERROR) {
+      statusText = '⚠️ *API 오류 발생*';
+    } else if (result.isSlow) {
+      statusText = '⚠️ *응답 시간 느림*';
+    } else {
+      statusText = '✅ *정상 작동*';
+    }
+
     await webhook.send({
-      text: `${emoji} [${result.apiName}] API 모니터링 결과`,
+      text: `${emoji} *[${result.apiName}]* API 모니터링 결과`,
       attachments: [
         {
           color,
+          pretext: statusText,
           fields: createResultFields(result),
-          footer: `API Monitor | Channel: #${channel}`,
+          footer: `🤖 API Monitor · #${channel}`,
           ts: Math.floor(Date.now() / 1000),
         },
       ],
@@ -180,20 +201,28 @@ function determineOverallStatus(stats) {
 function createApiStatusText(results) {
   return results
     .map((result) => {
-      const statusEmoji =
-        result.status === API_STATUS.SUCCESS
-          ? result.isSlow
-            ? '⚠️'
-            : '✅'
-          : '❌';
+      let statusIcon;
+      if (result.status === API_STATUS.ERROR) {
+        statusIcon = '🔴';
+      } else if (result.isSlow) {
+        statusIcon = '🟡';
+      } else {
+        statusIcon = '🟢';
+      }
 
       const timeInfo =
-        result.status === API_STATUS.SUCCESS ? ` (${result.responseTimeStr})` : '';
+        result.status === API_STATUS.SUCCESS
+          ? ` · \`${result.responseTimeStr}\``
+          : ` · \`${result.statusCode}\``;
 
-      const slowWarning =
-        result.isSlow && result.status === API_STATUS.SUCCESS ? ' 🐢' : '';
+      const speedIndicator =
+        result.status === API_STATUS.SUCCESS
+          ? result.isSlow
+            ? ' 🐢'
+            : ' ⚡'
+          : ' ❌';
 
-      return `${statusEmoji} *${result.apiName}*: ${result.statusCode}${timeInfo}${slowWarning}`;
+      return `${statusIcon} *${result.apiName}*${timeInfo}${speedIndicator}`;
     })
     .join('\n');
 }
@@ -202,16 +231,18 @@ function createApiStatusText(results) {
  * 요약 알림 필드 생성
  */
 function createSummaryFields(results, stats) {
+  const successRate = stats.total > 0 ? ((stats.success / stats.total) * 100).toFixed(1) : 0;
+  const healthIcon = stats.error === 0 ? '💚' : stats.error === stats.total ? '💔' : '💛';
+
   const fields = [
     {
-      title: '전체 상태',
-      value: `총 ${stats.total}개 | 성공 ${stats.success}개 | 실패 ${stats.error}개${
-        stats.slow > 0 ? ` | 느림 ${stats.slow}개` : ''
-      }`,
+      title: '📊 전체 상태',
+      value: `${healthIcon} 총 *${stats.total}개* API | 성공률 *${successRate}%*\n` +
+        `🟢 정상: ${stats.success}개${stats.slow > 0 ? ` (🐢 느림: ${stats.slow}개)` : ''} | 🔴 실패: ${stats.error}개`,
       short: false,
     },
     {
-      title: 'API 상태',
+      title: '🔍 API 상세 현황',
       value: createApiStatusText(results),
       short: false,
     },
@@ -221,11 +252,11 @@ function createSummaryFields(results, stats) {
   if (stats.error > 0) {
     const errorDetails = results
       .filter((r) => r.status === API_STATUS.ERROR)
-      .map((r) => `• ${r.apiName}: ${r.error}`)
-      .join('\n');
+      .map((r) => `🔴 *${r.apiName}*\n   └ \`${r.error}\``)
+      .join('\n\n');
 
     fields.push({
-      title: '오류 상세',
+      title: '❗ 오류 상세',
       value: errorDetails,
       short: false,
     });
@@ -237,12 +268,12 @@ function createSummaryFields(results, stats) {
       .filter((r) => r.status === API_STATUS.SUCCESS && r.isSlow)
       .map(
         (r) =>
-          `• ${r.apiName}: ${r.responseTimeStr} (임계값: ${r.threshold || config.monitoring.responseTimeThreshold}ms)`
+          `🐢 *${r.apiName}*\n   └ ${r.responseTimeStr} (임계값: ${r.threshold || config.monitoring.responseTimeThreshold}ms)`
       )
-      .join('\n');
+      .join('\n\n');
 
     fields.push({
-      title: '느린 응답 상세',
+      title: '⚠️ 느린 응답 상세',
       value: slowDetails,
       short: false,
     });
@@ -308,13 +339,26 @@ async function sendChannelSummary(channel, results) {
     const emoji = NOTIFICATION_EMOJIS[overallStatus];
     const color = NOTIFICATION_COLORS[overallStatus];
 
+    // 전체 상태 메시지
+    let overallMessage;
+    if (stats.error === 0 && stats.slow === 0) {
+      overallMessage = '✨ *모든 API 정상 작동 중*';
+    } else if (stats.error === stats.total) {
+      overallMessage = '🚨 *모든 API 오류 발생*';
+    } else if (stats.error > 0) {
+      overallMessage = `⚠️ *일부 API 오류 발생* (${stats.error}개)`;
+    } else {
+      overallMessage = `⚠️ *일부 API 응답 느림* (${stats.slow}개)`;
+    }
+
     await webhook.send({
-      text: `${emoji} API 모니터링 요약 (#${channel})`,
+      text: `${emoji} *API 모니터링 요약* · #${channel}`,
       attachments: [
         {
           color,
+          pretext: overallMessage,
           fields: createSummaryFields(results, stats),
-          footer: `API Monitor | Channel: #${channel} | ${new Date().toLocaleString('ko-KR')}`,
+          footer: `🤖 API Monitor · ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`,
           ts: Math.floor(Date.now() / 1000),
         },
       ],
