@@ -198,8 +198,8 @@ function determineOverallStatus(stats) {
 /**
  * API 상태 텍스트 생성
  */
-function createApiStatusText(results) {
-  return results
+function createApiStatusText(results, stats) {
+  return results.filter((r) => r.status === API_STATUS.ERROR || (r.status === API_STATUS.SUCCESS && r.isSlow))
     .map((result) => {
       let statusIcon;
       if (result.status === API_STATUS.ERROR) {
@@ -222,7 +222,7 @@ function createApiStatusText(results) {
             : ' ⚡'
           : ' ❌';
 
-      return `${statusIcon} *${result.apiName}*${timeInfo}${speedIndicator}`;
+      return `${statusIcon} *${result.apiName}*${timeInfo}(임계값:${result.threshold})${speedIndicator}`;
     })
     .join('\n');
 }
@@ -243,41 +243,41 @@ function createSummaryFields(results, stats) {
     },
     {
       title: '🔍 API 상세 현황',
-      value: createApiStatusText(results),
+      value: createApiStatusText(results, stats),
       short: false,
     },
   ];
 
-  // 오류 상세 추가
-  if (stats.error > 0) {
-    const errorDetails = results
-      .filter((r) => r.status === API_STATUS.ERROR)
-      .map((r) => `🔴 *${r.apiName}*\n   └ \`${r.error}\``)
-      .join('\n\n');
+  // // 오류 상세 추가
+  // if (stats.error > 0) {
+  //   const errorDetails = results
+  //     .filter((r) => r.status === API_STATUS.ERROR)
+  //     .map((r) => `🔴 *${r.apiName}*\n   └ \`${r.error}\``)
+  //     .join('\n\n');
 
-    fields.push({
-      title: '❗ 오류 상세',
-      value: errorDetails,
-      short: false,
-    });
-  }
+  //   fields.push({
+  //     title: '❗ 오류 상세',
+  //     value: errorDetails,
+  //     short: false,
+  //   });
+  // }
 
   // 느린 응답 상세 추가
-  if (stats.slow > 0) {
-    const slowDetails = results
-      .filter((r) => r.status === API_STATUS.SUCCESS && r.isSlow)
-      .map(
-        (r) =>
-          `🐢 *${r.apiName}*\n   └ ${r.responseTimeStr} (임계값: ${r.threshold || config.monitoring.responseTimeThreshold}ms)`
-      )
-      .join('\n\n');
+  // if (stats.slow > 0) {
+  //   const slowDetails = results
+  //     .filter((r) => r.status === API_STATUS.SUCCESS && r.isSlow)
+  //     .map(
+  //       (r) =>
+  //         `🐢 *${r.apiName}*\n   └ ${r.responseTimeStr} (임계값: ${r.threshold || config.monitoring.responseTimeThreshold}ms)`
+  //     )
+  //     .join('\n\n');
 
-    fields.push({
-      title: '⚠️ 느린 응답 상세',
-      value: slowDetails,
-      short: false,
-    });
-  }
+  //   fields.push({
+  //     title: '⚠️ 느린 응답 상세',
+  //     value: slowDetails,
+  //     short: false,
+  //   });
+  // }
 
   return fields;
 }
