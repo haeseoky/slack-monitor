@@ -12,7 +12,7 @@ module.exports = [
     },
     body: {},
     timeout: 5000,
-    enabled: true,
+    enabled: false,
     channel: 'health', // 알림을 받을 채널 (SLACK_WEBHOOK_URLS에서 정의된 채널명)
     checkInterval: 1000, // 체크 간격 (밀리초, 선택) - 미지정 시 .env의 CHECK_INTERVAL 사용
     responseTimeThreshold: 100, // 응답 시간 임계값 (밀리초, 선택) - 미지정 시 .env의 RESPONSE_TIME_THRESHOLD 사용
