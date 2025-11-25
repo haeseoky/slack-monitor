@@ -355,6 +355,41 @@ async function notifySearchResult(searchConfig, post) {
 }
 
 /**
+ * Slack으로 검색 결과 통계/상태 알림 전송 (무조건 발송)
+ */
+async function notifySearchStatus(searchConfig, stats) {
+  try {
+    const webhookUrl = getWebhookUrl(searchConfig.webhookKey);
+    if (!webhookUrl) return;
+
+    const webhook = new IncomingWebhook(webhookUrl);
+    const searchTypeText = { blog: '블로그', news: '뉴스', cafe: '카페' };
+
+    const fields = [
+      { title: '검색어', value: searchConfig.keyword, short: true },
+      { title: '타입', value: searchTypeText[searchConfig.searchType] || searchConfig.searchType, short: true },
+      { title: '전체 조회', value: `${stats.totalCount}건`, short: true },
+      { title: '신규 발견', value: `${stats.newCount}건`, short: true },
+    ];
+
+    const color = stats.newCount > 0 ? '#36a64f' : '#3AA3E3'; // 신규가 있으면 초록, 없으면 파랑
+
+    await webhook.send({
+      text: `📊 네이버 검색 통계: ${searchConfig.keyword} (${searchTypeText[searchConfig.searchType]})`,
+      channel: `#${searchConfig.channel}`,
+      attachments: [{
+        color: color,
+        fields: fields,
+        footer: `상태: ${stats.message || '정상'}`,
+        ts: Math.floor(Date.now() / 1000),
+      }],
+    });
+  } catch (error) {
+    logger.error(`[${searchConfig.id}] 상태 알림 전송 실패`, error);
+  }
+}
+
+/**
  * 신규 검색 결과 확인 및 알림
  */
 async function checkNewSearchResults(searchConfig) {
@@ -362,16 +397,36 @@ async function checkNewSearchResults(searchConfig) {
     logger.info(`[${searchConfig.id}] 네이버 검색 모니터링 시작 - 키워드: ${searchConfig.keyword} (${searchConfig.searchType})`);
 
     const currentPosts = await fetchSearchResults(searchConfig);
+    const lastCheck = await loadLastCheck(searchConfig.id);
+    let newPosts = [];
+    let isFirstRun = false;
 
+    // 첫 실행 체크
+    if (!lastCheck.lastPostId) {
+      isFirstRun = true;
+      logger.info(`[${searchConfig.id}] 첫 실행입니다.`);
+    } else {
+      // 신규 게시글 필터링
+      newPosts = currentPosts.filter(
+        (post) => !lastCheck.seenPostIds.includes(post.postId)
+      );
+    }
+
+    // 1. [변경] 통계 알림 무조건 발송
+    await notifySearchStatus(searchConfig, {
+      totalCount: currentPosts.length,
+      newCount: isFirstRun ? currentPosts.length : newPosts.length,
+      message: isFirstRun ? '첫 실행 (초기화)' : '모니터링 중'
+    });
+
+    // 조회 결과가 없으면 여기서 종료하지만, 알림은 위에서 이미 보냈음
     if (currentPosts.length === 0) {
       logger.warn(`[${searchConfig.id}] 가져온 검색 결과가 없습니다`);
       return;
     }
 
-    const lastCheck = await loadLastCheck(searchConfig.id);
-
-    if (!lastCheck.lastPostId) {
-      logger.info(`[${searchConfig.id}] 첫 실행입니다. 현재 검색 결과를 기록합니다.`);
+    // 첫 실행이면 데이터만 저장하고 개별 알림은 생략 (또는 정책에 따라 다름, 여기선 저장만)
+    if (isFirstRun) {
       const seenPostIds = currentPosts.map((p) => p.postId);
       await saveLastCheck(searchConfig.id, {
         lastPostId: currentPosts[0]?.postId,
@@ -381,10 +436,7 @@ async function checkNewSearchResults(searchConfig) {
       return;
     }
 
-    const newPosts = currentPosts.filter(
-      (post) => !lastCheck.seenPostIds.includes(post.postId)
-    );
-
+    // 2. 신규 게시글 개별 알림 (기존 로직 유지)
     if (newPosts.length > 0) {
       logger.info(`[${searchConfig.id}] 신규 검색 결과 ${newPosts.length}개 발견`);
 
@@ -400,6 +452,7 @@ async function checkNewSearchResults(searchConfig) {
       logger.info(`[${searchConfig.id}] 신규 검색 결과가 없습니다`);
     }
 
+    // 상태 저장
     const seenPostIds = currentPosts.map((p) => p.postId);
     await saveLastCheck(searchConfig.id, {
       lastPostId: currentPosts[0]?.postId,
@@ -408,6 +461,7 @@ async function checkNewSearchResults(searchConfig) {
     });
   } catch (error) {
     logger.error(`[${searchConfig.id}] 검색 모니터링 실패`, error);
+    // 에러 발생 시에도 실패 알림을 보내고 싶다면 여기서 notifySearchStatus 호출 가능
   }
 }
 
