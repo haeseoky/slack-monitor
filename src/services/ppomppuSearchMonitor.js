@@ -102,15 +102,16 @@ async function fetchSearchResults(searchConfig) {
     const $ = cheerio.load(html);
     const posts = [];
 
-    // 검색 결과는 li > div.content 구조를 사용
-    $('li').each((index, element) => {
-      const $li = $(element);
-      const $content = $li.find('div.content');
+    // 검색 결과는 div.conts > div.content 구조를 사용
+    $('div.conts').each((index, element) => {
+      const $conts = $(element);
+      const $content = $conts.find('div.content');
 
       if ($content.length > 0) {
         // 제목 링크 찾기
         const titleLink = $content.find('span.title a').first();
-        const title = titleLink.text().trim().replace(/<\/?b>/g, ''); // <b> 태그 제거
+        const titleHtml = titleLink.html() || '';
+        const title = titleLink.text().trim(); // cheerio가 자동으로 <b> 태그 제거
         const link = titleLink.attr('href');
 
         // 게시글 ID 추출 (URL에서)
@@ -128,16 +129,17 @@ async function fetchSearchResults(searchConfig) {
         }
 
         // 썸네일 이미지
-        const thumbDiv = $li.find('div.thumb').first();
+        const thumbDiv = $conts.find('div.thumb').first();
         let imageUrl = '';
         if (thumbDiv.length > 0) {
           const bgImage = thumbDiv.attr('style');
           if (bgImage) {
             const urlMatch = bgImage.match(/url\(([^)]+)\)/);
             if (urlMatch) {
-              imageUrl = urlMatch[1].startsWith('http')
-                ? urlMatch[1]
-                : `https:${urlMatch[1]}`;
+              let imgUrl = urlMatch[1].replace(/['"]/g, ''); // 따옴표 제거
+              imageUrl = imgUrl.startsWith('http')
+                ? imgUrl
+                : `https:${imgUrl}`;
             }
           }
         }
