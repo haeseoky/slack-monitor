@@ -93,8 +93,8 @@ async function startMonitoring(apiConfigs) {
   const enabledApis = apiConfigs.filter((api) => api.enabled !== false);
 
   if (enabledApis.length === 0) {
-    logger.error('활성화된 API가 없습니다. apis.config.js를 확인하세요.');
-    process.exit(1);
+    logger.warn('활성화된 API가 없습니다. API 모니터링을 건너뜁니다.');
+    return;
   }
 
   logMonitoringStart(enabledApis);
