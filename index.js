@@ -8,7 +8,9 @@
 const { config, validateConfig } = require('./src/config');
 const { startMonitoring, setupGracefulShutdown } = require('./src/services/monitoringService');
 const { startPpomppuMonitoring, stopPpomppuMonitoring } = require('./src/services/ppomppuMonitor');
+const { startAllSearchMonitoring, stopAllSearchMonitoring } = require('./src/services/ppomppuSearchMonitor');
 const apiConfigs = require('./apis.config');
+const ppomppuSearchConfigs = require('./ppomppu-search.config');
 const logger = require('./src/utils/logger');
 
 // 모니터링 인스턴스 저장
@@ -44,25 +46,35 @@ async function main() {
     // 뽐뿌 모니터링 시작 (활성화된 경우)
     if (config.ppomppu.enabled) {
       ppomppuIntervalId = startPpomppuMonitoring(config.ppomppu.checkInterval);
-
-      // Graceful shutdown에 뽐뿌 모니터링 중지 추가
-      const originalHandlers = process.listeners('SIGTERM').concat(process.listeners('SIGINT'));
-      process.removeAllListeners('SIGTERM');
-      process.removeAllListeners('SIGINT');
-
-      const shutdownHandler = () => {
-        logger.info('종료 신호 수신. 뽐뿌 모니터링을 정리합니다...');
-        stopPpomppuMonitoring(ppomppuIntervalId);
-
-        // 기존 핸들러 실행
-        originalHandlers.forEach((handler) => handler());
-      };
-
-      process.on('SIGTERM', shutdownHandler);
-      process.on('SIGINT', shutdownHandler);
     } else {
       logger.info('뽐뿌 모니터링이 비활성화되어 있습니다');
     }
+
+    // 뽐뿌 검색 모니터링 시작
+    startAllSearchMonitoring(ppomppuSearchConfigs);
+
+    // Graceful shutdown에 뽐뿌 관련 모니터링 중지 추가
+    const originalHandlers = process.listeners('SIGTERM').concat(process.listeners('SIGINT'));
+    process.removeAllListeners('SIGTERM');
+    process.removeAllListeners('SIGINT');
+
+    const shutdownHandler = () => {
+      logger.info('종료 신호 수신. 뽐뿌 모니터링을 정리합니다...');
+
+      // 뽐뿌 게시판 모니터링 중지
+      if (ppomppuIntervalId) {
+        stopPpomppuMonitoring(ppomppuIntervalId);
+      }
+
+      // 뽐뿌 검색 모니터링 중지
+      stopAllSearchMonitoring();
+
+      // 기존 핸들러 실행
+      originalHandlers.forEach((handler) => handler());
+    };
+
+    process.on('SIGTERM', shutdownHandler);
+    process.on('SIGINT', shutdownHandler);
   } catch (error) {
     logger.error('애플리케이션 시작 실패', error);
     process.exit(1);

@@ -30,3 +30,4 @@ Thumbs.db
 
 # 뽐뿌 모니터링 상태 파일
 .ppomppu-last-check.json
+.ppomppu-search-*.json
