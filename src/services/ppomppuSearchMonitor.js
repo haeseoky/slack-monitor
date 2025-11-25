@@ -102,44 +102,49 @@ async function fetchSearchResults(searchConfig) {
     const $ = cheerio.load(html);
     const posts = [];
 
-    // 검색 결과는 list_title 클래스를 사용
-    $('tr.list_title').each((index, element) => {
-      const $row = $(element);
-      const tds = $row.find('td');
+    // 검색 결과는 li > div.content 구조를 사용
+    $('li').each((index, element) => {
+      const $li = $(element);
+      const $content = $li.find('div.content');
 
-      if (tds.length >= 5) {
-        // TD 구조: [게시판, 제목, 작성자, 날짜, 조회수]
-        const board = $(tds[0]).text().trim();
-
-        // 제목 링크 찾기 (TD[1]에 있음)
-        const titleLink = $(tds[1]).find('a').first();
-        const title = titleLink.text().trim();
+      if ($content.length > 0) {
+        // 제목 링크 찾기
+        const titleLink = $content.find('span.title a').first();
+        const title = titleLink.text().trim().replace(/<\/?b>/g, ''); // <b> 태그 제거
         const link = titleLink.attr('href');
 
         // 게시글 ID 추출 (URL에서)
         let postId = '';
+        let board = '';
         if (link) {
-          const match = link.match(/no=(\d+)/);
-          if (match) {
-            postId = match[1];
+          const noMatch = link.match(/no=(\d+)/);
+          const idMatch = link.match(/id=([^&]+)/);
+          if (noMatch) {
+            postId = noMatch[1];
+          }
+          if (idMatch) {
+            board = idMatch[1];
           }
         }
 
-        const author = $(tds[2]).text().trim();
-        const date = $(tds[3]).text().trim();
-        const hit = $(tds[4]).text().trim();
-
-        // 썸네일 이미지 (TD[1]에 있을 수 있음)
-        const thumbImg = $(tds[1]).find('img').first();
+        // 썸네일 이미지
+        const thumbDiv = $li.find('div.thumb').first();
         let imageUrl = '';
-        if (thumbImg.length > 0) {
-          const imgSrc = thumbImg.attr('src');
-          if (imgSrc) {
-            imageUrl = imgSrc.startsWith('http')
-              ? imgSrc
-              : `https:${imgSrc}`;
+        if (thumbDiv.length > 0) {
+          const bgImage = thumbDiv.attr('style');
+          if (bgImage) {
+            const urlMatch = bgImage.match(/url\(([^)]+)\)/);
+            if (urlMatch) {
+              imageUrl = urlMatch[1].startsWith('http')
+                ? urlMatch[1]
+                : `https:${urlMatch[1]}`;
+            }
           }
         }
+
+        // 날짜와 조회수 (있는 경우)
+        const dateText = $content.find('.date').text().trim();
+        const hitText = $content.find('.hit').text().trim();
 
         if (postId && title && link) {
           // 상대 경로를 절대 경로로 변환
@@ -152,9 +157,9 @@ async function fetchSearchResults(searchConfig) {
             title,
             link: fullLink,
             board,
-            author,
-            date,
-            hit,
+            author: '', // 검색 결과에는 작성자 정보가 없을 수 있음
+            date: dateText,
+            hit: hitText,
             imageUrl,
           });
         }
