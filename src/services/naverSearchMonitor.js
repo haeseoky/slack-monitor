@@ -4,6 +4,7 @@
  */
 
 const axios = require('axios');
+const crypto = require('crypto');
 const fs = require('fs').promises;
 const path = require('path');
 const { IncomingWebhook } = require('@slack/webhook');
@@ -127,21 +128,23 @@ async function fetchSearchResults(searchConfig) {
       const title = stripHtml(item.title || '');
       const desc = stripHtml(item.description || '');
       const link = item.link || item.originallink || '';
+      const pubDate = item.postdate || item.pubDate || '';
 
-      // postId 생성
+      // postId 생성: 안정적인 고유 식별자 생성
       let postId = '';
       if (searchType === 'blog') {
         const logNoMatch = link.match(/logNo=(\d+)/);
         const pathMatch = link.match(/blog\.naver\.com\/[^\/]+\/(\d+)/);
-        postId = logNoMatch ? logNoMatch[1] : (pathMatch ? pathMatch[1] : `blog_${index}_${Date.now()}`);
+        postId = logNoMatch ? logNoMatch[1] : (pathMatch ? pathMatch[1] : crypto.createHash('md5').update(title + pubDate + link).digest('hex').substring(0, 16));
       } else if (searchType === 'news') {
         const oidMatch = link.match(/oid=(\d+)/);
         const aidMatch = link.match(/aid=(\d+)/);
-        postId = (oidMatch && aidMatch) ? `${oidMatch[1]}_${aidMatch[1]}` : `news_${index}_${Date.now()}`;
+        // link에서 추출 실패 시 제목+날짜+링크의 해시값 사용 (안정적인 고유 ID)
+        postId = (oidMatch && aidMatch) ? `${oidMatch[1]}_${aidMatch[1]}` : crypto.createHash('md5').update(title + pubDate + link).digest('hex').substring(0, 16);
       } else if (searchType === 'cafe') {
         const articleMatch = link.match(/articleid=(\d+)/);
         const pathMatch = link.match(/cafe\.naver\.com\/[^\/]+\/(\d+)/);
-        postId = articleMatch ? articleMatch[1] : (pathMatch ? pathMatch[1] : `cafe_${index}_${Date.now()}`);
+        postId = articleMatch ? articleMatch[1] : (pathMatch ? pathMatch[1] : crypto.createHash('md5').update(title + pubDate + link).digest('hex').substring(0, 16));
       }
 
       return {
