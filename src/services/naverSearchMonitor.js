@@ -200,54 +200,16 @@ async function notifySearchResult(searchConfig, post) {
 
     const fields = [
       {
-        title: '🔍 검색어',
-        value: `\`${searchConfig.keyword}\``,
-        short: true,
-      },
-      {
-        title: '📂 검색 타입',
-        value: searchTypeText[post.searchType] || post.searchType,
-        short: true,
-      },
-      {
         title: '📌 제목',
         value: post.title,
         short: false,
       },
-    ];
-
-    // 설명 추가 (있는 경우)
-    if (post.desc) {
-      fields.push({
-        title: '📄 내용',
-        value: post.desc.substring(0, 200) + (post.desc.length > 200 ? '...' : ''),
+      {
+        title: '🔗 링크',
+        value: `<${post.link}|게시글 보기>`,
         short: false,
-      });
-    }
-
-    // 작성자/출처 추가
-    if (post.author || post.cafeName) {
-      fields.push({
-        title: '✍️ 작성자/출처',
-        value: post.cafeName ? `${post.author} (${post.cafeName})` : post.author,
-        short: true,
-      });
-    }
-
-    // 날짜 추가
-    if (post.date) {
-      fields.push({
-        title: '📅 날짜',
-        value: post.date,
-        short: true,
-      });
-    }
-
-    fields.push({
-      title: '🔗 링크',
-      value: `<${post.link}|게시글 보기>`,
-      short: false,
-    });
+      },
+    ];
 
     const attachment = {
       color: '#36a64f',
@@ -343,24 +305,27 @@ async function checkNewSearchResults(searchConfig) {
     if (newPosts.length > 0) {
       logger.info(`[${searchConfig.id}] 신규 검색 결과 ${newPosts.length}개 발견`);
 
-      for (const post of newPosts.slice(0, 5)) {
+      // 100개 이상이면 최신 10개만 알림
+      const notifyLimit = newPosts.length >= 100 ? 10 : 5;
+
+      for (const post of newPosts.slice(0, notifyLimit)) {
         await notifySearchResult(searchConfig, post);
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
-      if (newPosts.length > 5) {
-        logger.info(`[${searchConfig.id}] ${newPosts.length - 5}개의 추가 신규 게시글은 알림을 생략했습니다`);
+      if (newPosts.length > notifyLimit) {
+        logger.info(`[${searchConfig.id}] ${newPosts.length - notifyLimit}개의 추가 신규 게시글은 알림을 생략했습니다`);
       }
     } else {
       logger.info(`[${searchConfig.id}] 신규 검색 결과가 없습니다`);
     }
 
-    // 상태 저장
+    // 상태 저장 (최근 200개 ID 보관으로 중복 감지 향상)
     const seenPostIds = currentPosts.map((p) => p.postId);
     await saveLastCheck(searchConfig.id, {
       lastPostId: currentPosts[0]?.postId,
       lastCheckTime: new Date().toISOString(),
-      seenPostIds: seenPostIds.slice(0, 100),
+      seenPostIds: seenPostIds.slice(0, 200),
     });
   } catch (error) {
     logger.error(`[${searchConfig.id}] 검색 모니터링 실패`, error);
