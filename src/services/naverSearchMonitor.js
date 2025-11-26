@@ -94,7 +94,7 @@ async function fetchSearchResults(searchConfig) {
     const response = await axios.get(apiUrl, {
       params: {
         query: searchConfig.keyword,
-        display: 10, // 한 번에 가져올 결과 수 (최대 100)
+        display: 100, // 한 번에 가져올 결과 수 (최대 100)
         sort: 'date', // 최신순 정렬
       },
       headers: {
@@ -278,25 +278,14 @@ async function notifySearchStatus(searchConfig, stats) {
 
     const webhook = new IncomingWebhook(webhookUrl);
     const searchTypeText = { blog: '블로그', news: '뉴스', cafe: '카페' };
+    const typeText = searchTypeText[searchConfig.searchType] || searchConfig.searchType;
 
-    const fields = [
-      { title: '검색어', value: searchConfig.keyword, short: true },
-      { title: '타입', value: searchTypeText[searchConfig.searchType] || searchConfig.searchType, short: true },
-      { title: '전체 조회', value: `${stats.totalCount}건`, short: true },
-      { title: '신규 발견', value: `${stats.newCount}건`, short: true },
-    ];
-
-    const color = stats.newCount > 0 ? '#36a64f' : '#3AA3E3';
+    // 한 줄 형식: 타입/조회건수/신규건수
+    const statusMessage = `${typeText} / 조회 ${stats.totalCount}건 / 신규 ${stats.newCount}건`;
 
     await webhook.send({
-      text: `📊 네이버 검색 통계: ${searchConfig.keyword} (${searchTypeText[searchConfig.searchType]})`,
+      text: statusMessage,
       channel: `#${searchConfig.channel}`,
-      attachments: [{
-        color: color,
-        fields: fields,
-        footer: `상태: ${stats.message || '정상'} (API)`,
-        ts: Math.floor(Date.now() / 1000),
-      }],
     });
   } catch (error) {
     logger.error(`[${searchConfig.id}] 상태 알림 전송 실패`, error);
