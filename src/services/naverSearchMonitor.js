@@ -17,6 +17,16 @@ const STORAGE_DIR = path.join(__dirname, '../../');
 // 검색별 타이머 저장
 const searchTimers = new Map();
 
+// 요청 간격 랜덤화를 위한 상수 (5~15초)
+const MIN_REQUEST_DELAY = 5000;
+const MAX_REQUEST_DELAY = 15000;
+
+// 쿠키 및 세션 유지를 위한 axios 인스턴스
+const axiosInstance = axios.create({
+  timeout: 15000,
+  maxRedirects: 5,
+});
+
 /**
  * 검색별 마지막 체크 파일 경로 생성
  */
@@ -84,6 +94,23 @@ function buildSearchUrl(searchConfig) {
 }
 
 /**
+ * 랜덤 지연 시간 생성 (봇 차단 방지)
+ */
+function getRandomDelay() {
+  return Math.floor(Math.random() * (MAX_REQUEST_DELAY - MIN_REQUEST_DELAY + 1)) + MIN_REQUEST_DELAY;
+}
+
+/**
+ * CAPTCHA 페이지 여부 확인
+ */
+function isCaptchaPage(html) {
+  return html.includes('자동입력 방지') ||
+         html.includes('보안문자') ||
+         html.includes('captcha') ||
+         html.includes('nhncaptcha');
+}
+
+/**
  * 네이버 검색 결과 페이지에서 게시글 목록 가져오기
  */
 async function fetchSearchResults(searchConfig) {
@@ -91,19 +118,41 @@ async function fetchSearchResults(searchConfig) {
     const searchUrl = buildSearchUrl(searchConfig);
     logger.info(`[${searchConfig.id}] 검색 URL: ${searchUrl}`);
 
-    const response = await axios.get(searchUrl, {
-      timeout: 10000,
+    // 랜덤 지연 추가 (봇 차단 방지)
+    const delay = getRandomDelay();
+    logger.info(`[${searchConfig.id}] 요청 전 ${(delay / 1000).toFixed(1)}초 대기 중...`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    const response = await axiosInstance.get(searchUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Encoding': 'gzip, deflate, br, zstd',
         'Referer': 'https://www.naver.com/',
         'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'same-site',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0',
+        'DNT': '1',
       },
     });
 
     const html = response.data;
+
+    // CAPTCHA 페이지 확인
+    if (isCaptchaPage(html)) {
+      logger.error(`[${searchConfig.id}] ⚠️  봇으로 판단되어 CAPTCHA 페이지가 반환되었습니다!`);
+
+      // CAPTCHA 감지 알림 전송
+      await notifyCaptchaDetected(searchConfig);
+
+      return [];
+    }
+
     const $ = cheerio.load(html);
     const posts = [];
 
@@ -386,6 +435,39 @@ async function notifySearchStatus(searchConfig, stats) {
     });
   } catch (error) {
     logger.error(`[${searchConfig.id}] 상태 알림 전송 실패`, error);
+  }
+}
+
+/**
+ * Slack으로 CAPTCHA 감지 알림 전송
+ */
+async function notifyCaptchaDetected(searchConfig) {
+  try {
+    const webhookUrl = getWebhookUrl(searchConfig.webhookKey);
+    if (!webhookUrl) return;
+
+    const webhook = new IncomingWebhook(webhookUrl);
+    const searchTypeText = { blog: '블로그', news: '뉴스', cafe: '카페' };
+
+    await webhook.send({
+      text: `🚨 네이버 검색 봇 차단 감지!`,
+      channel: `#${searchConfig.channel}`,
+      attachments: [{
+        color: '#ff0000',
+        fields: [
+          { title: '검색어', value: searchConfig.keyword, short: true },
+          { title: '타입', value: searchTypeText[searchConfig.searchType], short: true },
+          { title: '문제', value: '봇으로 판단되어 CAPTCHA 페이지가 반환됨', short: false },
+          { title: '조치사항', value: '• 체크 간격을 더 길게 조정하세요\n• IP 주소 변경을 고려하세요\n• 수동으로 네이버 검색을 실행하여 CAPTCHA를 해제하세요', short: false },
+        ],
+        footer: '네이버 검색 모니터 - 봇 차단 감지',
+        ts: Math.floor(Date.now() / 1000),
+      }],
+    });
+
+    logger.warn(`[${searchConfig.id}] CAPTCHA 감지 알림 전송 완료`);
+  } catch (error) {
+    logger.error(`[${searchConfig.id}] CAPTCHA 알림 전송 실패`, error);
   }
 }
 

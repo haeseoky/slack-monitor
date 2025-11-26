@@ -10,7 +10,7 @@ module.exports = [
     searchType: 'blog', // blog, news, cafe
     channel: 'naver-monimo', // Slack 채널명
     webhookKey: 'health', // .env의 SLACK_WEBHOOK_URLS에서 사용할 키
-    checkInterval: 300000, // 체크 간격 (밀리초) - 기본 5분
+    checkInterval: 600000, // 체크 간격 (밀리초) - 10분 (봇 차단 방지)
     enabled: true,
   },
   {
@@ -19,7 +19,7 @@ module.exports = [
     searchType: 'news',
     channel: 'naver-monimo',
     webhookKey: 'health',
-    checkInterval: 300000, // 체크 간격 (밀리초) - 기본 5분
+    checkInterval: 720000, // 체크 간격 (밀리초) - 12분 (봇 차단 방지, 각기 다른 간격)
     enabled: true,
   },
   {
@@ -28,7 +28,7 @@ module.exports = [
     searchType: 'cafe',
     channel: 'naver-monimo',
     webhookKey: 'health',
-    checkInterval: 300000, // 체크 간격 (밀리초) - 기본 5분
+    checkInterval: 840000, // 체크 간격 (밀리초) - 14분 (봇 차단 방지, 각기 다른 간격)
     enabled: true,
   },
   // 추가 검색 조건 예시
