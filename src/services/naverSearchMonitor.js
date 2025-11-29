@@ -233,29 +233,29 @@ async function notifySearchResult(searchConfig, post) {
   }
 }
 
-/**
- * Slack으로 검색 결과 통계/상태 알림 전송
- */
-async function notifySearchStatus(searchConfig, stats) {
-  try {
-    const webhookUrl = getWebhookUrl(searchConfig.webhookKey);
-    if (!webhookUrl) return;
+// /**
+//  * Slack으로 검색 결과 통계/상태 알림 전송
+//  */
+// async function notifySearchStatus(searchConfig, stats) {
+//   try {
+//     const webhookUrl = getWebhookUrl(searchConfig.webhookKey);
+//     if (!webhookUrl) return;
 
-    const webhook = new IncomingWebhook(webhookUrl);
-    const searchTypeText = { blog: '블로그', news: '뉴스', cafe: '카페' };
-    const typeText = searchTypeText[searchConfig.searchType] || searchConfig.searchType;
+//     const webhook = new IncomingWebhook(webhookUrl);
+//     const searchTypeText = { blog: '블로그', news: '뉴스', cafe: '카페' };
+//     const typeText = searchTypeText[searchConfig.searchType] || searchConfig.searchType;
 
-    // 한 줄 형식: 타입/조회건수/신규건수
-    const statusMessage = `${typeText} / 조회 ${stats.totalCount}건 / 신규 ${stats.newCount}건`;
+//     // 한 줄 형식: 타입/조회건수/신규건수
+//     const statusMessage = `${typeText} / 조회 ${stats.totalCount}건 / 신규 ${stats.newCount}건`;
 
-    await webhook.send({
-      text: statusMessage,
-      channel: `#${searchConfig.channel}`,
-    });
-  } catch (error) {
-    logger.error(`[${searchConfig.id}] 상태 알림 전송 실패`, error);
-  }
-}
+//     await webhook.send({
+//       text: statusMessage,
+//       channel: `#${searchConfig.channel}`,
+//     });
+//   } catch (error) {
+//     logger.error(`[${searchConfig.id}] 상태 알림 전송 실패`, error);
+//   }
+// }
 
 /**
  * 신규 검색 결과 확인 및 알림
@@ -280,12 +280,12 @@ async function checkNewSearchResults(searchConfig) {
       );
     }
 
-    // 통계 알림 발송
-    await notifySearchStatus(searchConfig, {
-      totalCount: currentPosts.length,
-      newCount: isFirstRun ? currentPosts.length : newPosts.length,
-      message: isFirstRun ? '첫 실행 (초기화)' : '모니터링 중'
-    });
+    // // 통계 알림 발송
+    // await notifySearchStatus(searchConfig, {
+    //   totalCount: currentPosts.length,
+    //   newCount: isFirstRun ? currentPosts.length : newPosts.length,
+    //   message: isFirstRun ? '첫 실행 (초기화)' : '모니터링 중'
+    // });
 
     // 조회 결과가 없으면 종료
     if (currentPosts.length === 0) {
