@@ -10,6 +10,7 @@ const { startMonitoring, setupGracefulShutdown } = require('./src/services/monit
 const { startPpomppuMonitoring, stopPpomppuMonitoring } = require('./src/services/ppomppuMonitor');
 const { startAllSearchMonitoring, stopAllSearchMonitoring } = require('./src/services/ppomppuSearchMonitor');
 const { startAllSearchMonitoring: startNaverSearchMonitoring, stopAllSearchMonitoring: stopNaverSearchMonitoring } = require('./src/services/naverSearchMonitor');
+const { startCurrencyMonitoring, stopCurrencyMonitoring } = require('./src/services/currencyMonitor');
 const apiConfigs = require('./apis.config');
 const ppomppuSearchConfigs = require('./ppomppu-search.config');
 const naverSearchConfigs = require('./naver-search.config');
@@ -58,6 +59,9 @@ async function main() {
     // 네이버 검색 모니터링 시작
     startNaverSearchMonitoring(naverSearchConfigs);
 
+    // 환율 모니터링 시작 (1시간 간격)
+    startCurrencyMonitoring();
+
     // Graceful shutdown에 뽐뿌 및 네이버 관련 모니터링 중지 추가
     const originalHandlers = process.listeners('SIGTERM').concat(process.listeners('SIGINT'));
     process.removeAllListeners('SIGTERM');
@@ -76,6 +80,9 @@ async function main() {
 
       // 네이버 검색 모니터링 중지
       stopNaverSearchMonitoring();
+
+      // 환율 모니터링 중지
+      stopCurrencyMonitoring();
 
       // 기존 핸들러 실행
       originalHandlers.forEach((handler) => handler());
