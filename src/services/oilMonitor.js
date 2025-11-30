@@ -8,7 +8,7 @@ const { IncomingWebhook } = require('@slack/webhook');
 const logger = require('../utils/logger');
 
 const NAVER_FINANCE_URL = 'https://finance.naver.com/marketindex/';
-const DATA_FILE = path.join(__dirname, '../../oil-rates.json');
+const DATA_FILE = path.join(__dirname, '../../.oil-rates.json');
 
 // Display configurations
 const DISPLAY_CONFIG = [
