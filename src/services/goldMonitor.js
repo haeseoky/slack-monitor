@@ -163,7 +163,13 @@ async function checkAndNotify() {
       if (!result.success) {
         valueText = `⚠️ ${result.error}`;
       } else {
-        valueText = `💰 *${result.price}*`;
+        valueText = `💰 *${result.price} ${result.unit}*`; // Add unit
+        
+        if (result.id === 'DOM_GOLD') {
+            const pricePerGram = parseFloat(result.price.replace(/,/g, ''));
+            const pricePerDon = (pricePerGram * 3.75).toLocaleString(); // 1돈 = 3.75g
+            valueText += ` (1돈: ${pricePerDon} 원)`;
+        }
       }
       
       return {
