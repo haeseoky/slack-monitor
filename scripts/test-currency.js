@@ -1,7 +1,7 @@
 const { fetchRates } = require('../src/services/currencyMonitor');
 
 async function testCurrency() {
-  console.log('🔍 Testing Currency Monitor (Naver Source)...');
+  console.log('🔍 Testing Currency Monitor (Updated to JPY/KRW)...');
 
   const results = await fetchRates();
   

@@ -12,20 +12,19 @@ const DISPLAY_CONFIG = [
   {
     id: 'USD_KRW',
     name: '🇺🇸/🇰🇷 원/달러 환율 (USD/KRW)',
-    targetUrl: 'https://kr.investing.com/currencies/usd-krw',
-    unit: '원',
-    desc: '1달러 = ?원'
+    targetUrl: 'https://finance.naver.com/marketindex/exchangeDetail.naver?marketindexCd=FX_USDKRW',
+    unit: '원'
   },
   {
-    id: 'USD_JPY',
-    name: '🇺🇸/🇯🇵 엔/달러 환율 (USD/JPY)',
-    targetUrl: 'https://kr.investing.com/currencies/usd-jpy',
-    unit: '엔',
-    desc: '1달러 = ?엔'
+    id: 'JPY_KRW',
+    name: '🇯🇵/🇰🇷 엔/원 환율 (JPY/KRW)',
+    targetUrl: 'https://finance.naver.com/marketindex/exchangeDetail.naver?marketindexCd=FX_JPYKRW',
+    unit: '원'
   }
 ];
 
 let monitorInterval = null;
+let previousRates = {};
 
 /**
  * 환율 정보 스크래핑 (네이버 금융)
@@ -66,26 +65,28 @@ async function fetchRates() {
        });
     }
 
-    // 2. USD/JPY Extraction
-    // #worldExchangeList li (Need to find "달러/일본 엔")
-    let usdJpyPrice = null;
-    $('#worldExchangeList li').each((i, el) => {
+    // 2. JPY/KRW Extraction
+    // #exchangeList li (Need to find "일본 JPY")
+    // We iterate over #exchangeList li to find JPY since it might not always be in a fixed position or "on" class
+    let jpyKrwPrice = null;
+    
+    $('#exchangeList li').each((i, el) => {
       const name = $(el).find('.h_lst').text().trim();
-      if (name.includes('달러/일본 엔') || name.includes('USD/JPY')) {
-        usdJpyPrice = $(el).find('.value').text();
+      if (name.includes('일본 JPY') || name.includes('엔')) {
+        jpyKrwPrice = $(el).find('.value').text();
         return false; // break
       }
     });
 
-    if (usdJpyPrice) {
+    if (jpyKrwPrice) {
       results.push({
-        ...DISPLAY_CONFIG.find(c => c.id === 'USD_JPY'),
-        price: usdJpyPrice,
+        ...DISPLAY_CONFIG.find(c => c.id === 'JPY_KRW'),
+        price: jpyKrwPrice,
         success: true
       });
     } else {
       results.push({
-        ...DISPLAY_CONFIG.find(c => c.id === 'USD_JPY'),
+        ...DISPLAY_CONFIG.find(c => c.id === 'JPY_KRW'),
         error: '데이터 추출 실패 (항목 못찾음)',
         success: false
       });
@@ -112,6 +113,28 @@ async function checkAndNotify() {
   
   const results = await fetchRates();
   
+  // 변경 사항 확인
+  let hasChanges = false;
+  const changes = [];
+
+  for (const result of results) {
+    if (result.success) {
+      const prevPrice = previousRates[result.id];
+      if (prevPrice !== result.price) {
+        hasChanges = true;
+        changes.push(`${result.name}: ${prevPrice || '최초'} -> ${result.price}`);
+        previousRates[result.id] = result.price;
+      }
+    }
+  }
+
+  if (!hasChanges) {
+    logger.info('환율 변동 없음. 알림을 전송하지 않습니다.');
+    return;
+  }
+
+  logger.info(`환율 변동 감지: ${changes.join(', ')}`);
+  
   // 'currency' 채널 웹훅 가져오기
   const webhookUrl = getWebhookUrl('currency');
   
@@ -125,21 +148,32 @@ async function checkAndNotify() {
   try {
     const fields = results.map(result => {
       let valueText = '';
+      let descText = '';
+
       if (!result.success) {
         valueText = `⚠️ ${result.error || '조회 실패'}`;
       } else {
+        // e.g. 💰 1,470.00 원
         valueText = `💰 *${result.price} ${result.unit}*`;
+        
+        // Description generation
+        if (result.id === 'JPY_KRW') {
+             descText = `(100엔 = ${result.price} ${result.unit})`;
+        } else {
+             descText = `(1달러 = ${result.price} ${result.unit})`;
+        }
       }
       
       return {
         title: `${result.name}`,
-        value: `${valueText}\n(${result.desc})\n<${result.targetUrl}|👉 실시간 확인하기>`, 
+        value: `${valueText}\n${descText}\n<${result.targetUrl}|👉 실시간 차트 확인하기>`, 
         short: false
       };
     });
 
     await webhook.send({
       text: '💵 실시간 환율 정보 (Source: Naver Finance)',
+      channel: '#currency',
       attachments: [{
         color: '#2196F3',
         fields: fields,
@@ -159,9 +193,12 @@ async function checkAndNotify() {
  * 모니터링 시작
  */
 function startCurrencyMonitoring() {
+  // 시작 시 1회 즉시 실행
   checkAndNotify();
-  monitorInterval = setInterval(checkAndNotify, 60 * 60 * 1000);
-  logger.info('환율 모니터링이 시작되었습니다. (1시간 간격)');
+  
+  // 5분(300초 * 1000ms) 간격으로 반복 실행
+  monitorInterval = setInterval(checkAndNotify, 5 * 60 * 1000);
+  logger.info('환율 모니터링이 시작되었습니다. (5분 간격, 변동 시 알림)');
 }
 
 /**
