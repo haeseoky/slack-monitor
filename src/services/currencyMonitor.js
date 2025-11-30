@@ -167,7 +167,7 @@ async function checkAndNotify() {
   logger.info(`환율 변동 감지: ${changes.join(', ')}`);
   
   // 'currency' 채널 웹훅 가져오기
-  const webhookUrl = getWebhookUrl('currency');
+  const webhookUrl = getWebhookUrl('rich');
   
   if (!webhookUrl) {
     logger.error('환율 알림 전송 실패: currency 채널 웹훅 URL이 설정되지 않았습니다.');

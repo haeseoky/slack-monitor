@@ -213,7 +213,7 @@ async function checkAndNotify() {
   await saveRates(newRates);
   logger.info(`유가 시세 변동 감지: ${changes.join(', ')}`);
   
-  const webhookUrl = getWebhookUrl('oil');
+  const webhookUrl = getWebhookUrl('rich');
   if (!webhookUrl) {
     logger.error('유가 시세 알림 실패: oil 채널 웹훅 미설정');
     return;

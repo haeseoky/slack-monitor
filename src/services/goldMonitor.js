@@ -149,7 +149,7 @@ async function checkAndNotify() {
   await saveRates(newRates);
   logger.info(`금 시세 변동 감지: ${changes.join(', ')}`);
   
-  const webhookUrl = getWebhookUrl('gold');
+  const webhookUrl = getWebhookUrl('rich');
   if (!webhookUrl) {
     logger.error('금 시세 알림 실패: gold 채널 웹훅 미설정');
     return;
