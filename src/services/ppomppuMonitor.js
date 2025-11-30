@@ -257,12 +257,16 @@ async function checkNewPosts() {
       logger.info('신규 게시글이 없습니다');
     }
 
-    // 마지막 체크 정보 업데이트
-    const seenPostIds = currentPosts.map((p) => p.postId);
+    // 마지막 체크 정보 업데이트 (기존 seenPostIds에 새로운 게시글 추가)
+    const currentPostIds = currentPosts.map((p) => p.postId);
+    const updatedSeenPostIds = [
+      ...new Set([...currentPostIds, ...lastCheck.seenPostIds]), // 중복 제거하며 합침
+    ].slice(0, 200); // 최근 200개만 유지
+
     await saveLastCheck({
       lastPostId: currentPosts[0]?.postId,
       lastCheckTime: new Date().toISOString(),
-      seenPostIds: seenPostIds.slice(0, 100), // 최근 100개만 유지
+      seenPostIds: updatedSeenPostIds,
     });
   } catch (error) {
     logger.error('뽐뿌 신규 게시글 확인 실패', error);
