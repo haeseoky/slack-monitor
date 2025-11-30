@@ -1,20 +1,25 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const iconv = require('iconv-lite');
 const { getWebhookUrl } = require('../config');
 const { IncomingWebhook } = require('@slack/webhook');
 const logger = require('../utils/logger');
 
-// 모니터링 대상 환율 정보
-const CURRENCIES = [
+const NAVER_FINANCE_URL = 'https://finance.naver.com/marketindex/';
+
+// Display configurations (User requested links)
+const DISPLAY_CONFIG = [
   {
+    id: 'USD_KRW',
     name: '🇺🇸/🇰🇷 원/달러 환율 (USD/KRW)',
-    url: 'https://kr.investing.com/currencies/usd-krw',
+    targetUrl: 'https://kr.investing.com/currencies/usd-krw',
     unit: '원',
     desc: '1달러 = ?원'
   },
   {
+    id: 'USD_JPY',
     name: '🇺🇸/🇯🇵 엔/달러 환율 (USD/JPY)',
-    url: 'https://kr.investing.com/currencies/usd-jpy',
+    targetUrl: 'https://kr.investing.com/currencies/usd-jpy',
     unit: '엔',
     desc: '1달러 = ?엔'
   }
@@ -23,60 +28,79 @@ const CURRENCIES = [
 let monitorInterval = null;
 
 /**
- * 환율 정보 스크래핑
+ * 환율 정보 스크래핑 (네이버 금융)
+ * Investing.com의 봇 차단을 우회하기 위해 네이버 금융에서 데이터를 가져옵니다.
  */
-async function fetchCurrencyRate(currency) {
+async function fetchRates() {
   try {
-    const response = await axios.get(currency.url, {
+    const response = await axios.get(NAVER_FINANCE_URL, {
+      responseType: 'arraybuffer',
       headers: {
-        // 일반 브라우저처럼 보이게 설정
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7'
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       },
-      timeout: 10000 // 10초 타임아웃
+      timeout: 10000
     });
 
-    const $ = cheerio.load(response.data);
-    let price = null;
+    const content = iconv.decode(response.data, 'EUC-KR');
+    const $ = cheerio.load(content);
+    const results = [];
 
-    // 1. investing.com의 최신 data-test 속성 시도
-    price = $('[data-test="instrument-price-last"]').text();
-
-    // 2. 실패 시 클래스 기반 시도 (구형/변형 레이아웃 대응)
-    if (!price) {
-      price = $('.instrument-price_instrument-price__3uw25 .text-2xl').text();
+    // 1. USD/KRW Extraction
+    // #exchangeList li.on (usually the first item is USD)
+    const usdKrwItem = $('#exchangeList li.on').first();
+    const usdKrwPrice = usdKrwItem.find('.value').text();
+    
+    // Validate if we got the right item
+    const usdKrwName = usdKrwItem.find('.blind').text();
+    if (usdKrwPrice && (usdKrwName.includes('미국') || usdKrwName.includes('USD'))) {
+       results.push({
+         ...DISPLAY_CONFIG.find(c => c.id === 'USD_KRW'),
+         price: usdKrwPrice,
+         success: true
+       });
+    } else {
+       results.push({
+         ...DISPLAY_CONFIG.find(c => c.id === 'USD_KRW'),
+         error: '데이터 추출 실패',
+         success: false
+       });
     }
 
-    // 3. 메타 태그 등 대체 수단 (페이지 타이틀 등)
-    if (!price) {
-      // 타이틀 예시: "USD/KRW - 1,432.50 | Investing.com"
-      const title = $('title').text();
-      // 숫자와 콤마, 소수점 매칭
-      const match = title.match(/([\d,]+\.?\d*)/);
-      if (match) {
-        price = match[1];
+    // 2. USD/JPY Extraction
+    // #worldExchangeList li (Need to find "달러/일본 엔")
+    let usdJpyPrice = null;
+    $('#worldExchangeList li').each((i, el) => {
+      const name = $(el).find('.h_lst').text().trim();
+      if (name.includes('달러/일본 엔') || name.includes('USD/JPY')) {
+        usdJpyPrice = $(el).find('.value').text();
+        return false; // break
       }
+    });
+
+    if (usdJpyPrice) {
+      results.push({
+        ...DISPLAY_CONFIG.find(c => c.id === 'USD_JPY'),
+        price: usdJpyPrice,
+        success: true
+      });
+    } else {
+      results.push({
+        ...DISPLAY_CONFIG.find(c => c.id === 'USD_JPY'),
+        error: '데이터 추출 실패 (항목 못찾음)',
+        success: false
+      });
     }
 
-    return {
-      name: currency.name,
-      price: price ? price.trim() : '정보 없음',
-      url: currency.url,
-      unit: currency.unit,
-      desc: currency.desc
-    };
+    return results;
 
   } catch (error) {
-    logger.error(`환율 조회 실패 (${currency.name})`, error.message);
-    return {
-      name: currency.name,
-      price: '조회 실패',
-      url: currency.url,
-      unit: currency.unit,
-      desc: currency.desc,
-      error: true
-    };
+    logger.error('네이버 금융 조회 실패', error.message || error);
+    // Return error state for all configs
+    return DISPLAY_CONFIG.map(config => ({
+      ...config,
+      error: '네이버 금융 접속 실패',
+      success: false
+    }));
   }
 }
 
@@ -86,40 +110,38 @@ async function fetchCurrencyRate(currency) {
 async function checkAndNotify() {
   logger.info('환율 정보 조회 시작...');
   
-  // 병렬로 환율 정보 조회
-  const results = await Promise.all(CURRENCIES.map(fetchCurrencyRate));
+  const results = await fetchRates();
   
   // 'currency' 채널 웹훅 가져오기
   const webhookUrl = getWebhookUrl('currency');
   
   if (!webhookUrl) {
-    logger.error('환율 알림 전송 실패: currency 채널 웹훅 URL이 설정되지 않았습니다. (.env 설정을 확인하세요)');
+    logger.error('환율 알림 전송 실패: currency 채널 웹훅 URL이 설정되지 않았습니다.');
     return;
   }
 
   const webhook = new IncomingWebhook(webhookUrl);
 
   try {
-    // Slack 메시지 필드 구성
     const fields = results.map(result => {
       let valueText = '';
-      if (result.error) {
-        valueText = '⚠️ 조회 실패';
+      if (!result.success) {
+        valueText = `⚠️ ${result.error || '조회 실패'}`;
       } else {
         valueText = `💰 *${result.price} ${result.unit}*`;
       }
       
       return {
         title: `${result.name}`,
-        value: `${valueText}\n(${result.desc})\n<${result.url}|👉 실시간 확인하기> `,
+        value: `${valueText}\n(${result.desc})\n<${result.targetUrl}|👉 실시간 확인하기>`, 
         short: false
       };
     });
 
     await webhook.send({
-      text: '💵 [Investing.com] 실시간 환율 정보',
+      text: '💵 실시간 환율 정보 (Source: Naver Finance)',
       attachments: [{
-        color: '#2196F3', // 파란색 계열
+        color: '#2196F3',
         fields: fields,
         footer: `🤖 Currency Monitor · ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`,
         ts: Math.floor(Date.now() / 1000)
@@ -137,10 +159,7 @@ async function checkAndNotify() {
  * 모니터링 시작
  */
 function startCurrencyMonitoring() {
-  // 시작 시 1회 즉시 실행
   checkAndNotify();
-  
-  // 1시간(3600초 * 1000ms) 간격으로 반복 실행
   monitorInterval = setInterval(checkAndNotify, 60 * 60 * 1000);
   logger.info('환율 모니터링이 시작되었습니다. (1시간 간격)');
 }
@@ -158,5 +177,6 @@ function stopCurrencyMonitoring() {
 
 module.exports = {
   startCurrencyMonitoring,
-  stopCurrencyMonitoring
+  stopCurrencyMonitoring,
+  fetchRates // For testing
 };
