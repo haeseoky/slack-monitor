@@ -1,11 +1,14 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 const iconv = require('iconv-lite');
+const fs = require('fs').promises;
+const path = require('path');
 const { getWebhookUrl } = require('../config');
 const { IncomingWebhook } = require('@slack/webhook');
 const logger = require('../utils/logger');
 
 const NAVER_FINANCE_URL = 'https://finance.naver.com/marketindex/';
+const DATA_FILE = path.join(__dirname, '../../currency-rates.json');
 
 // Display configurations (User requested links)
 const DISPLAY_CONFIG = [
@@ -24,7 +27,30 @@ const DISPLAY_CONFIG = [
 ];
 
 let monitorInterval = null;
-let previousRates = {};
+
+/**
+ * 저장된 환율 정보 로드
+ */
+async function loadRates() {
+  try {
+    const data = await fs.readFile(DATA_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    // 파일이 없거나 파싱 에러 시 빈 객체 반환
+    return {};
+  }
+}
+
+/**
+ * 환율 정보 저장
+ */
+async function saveRates(rates) {
+  try {
+    await fs.writeFile(DATA_FILE, JSON.stringify(rates, null, 2));
+  } catch (error) {
+    logger.error('환율 데이터 저장 실패', error);
+  }
+}
 
 /**
  * 환율 정보 스크래핑 (네이버 금융)
@@ -112,10 +138,12 @@ async function checkAndNotify() {
   logger.info('환율 정보 조회 시작...');
   
   const results = await fetchRates();
+  const previousRates = await loadRates();
   
   // 변경 사항 확인
   let hasChanges = false;
   const changes = [];
+  const newRates = { ...previousRates };
 
   for (const result of results) {
     if (result.success) {
@@ -123,7 +151,7 @@ async function checkAndNotify() {
       if (prevPrice !== result.price) {
         hasChanges = true;
         changes.push(`${result.name}: ${prevPrice || '최초'} -> ${result.price}`);
-        previousRates[result.id] = result.price;
+        newRates[result.id] = result.price;
       }
     }
   }
@@ -132,6 +160,9 @@ async function checkAndNotify() {
     logger.info('환율 변동 없음. 알림을 전송하지 않습니다.');
     return;
   }
+
+  // 변경된 데이터 저장
+  await saveRates(newRates);
 
   logger.info(`환율 변동 감지: ${changes.join(', ')}`);
   
