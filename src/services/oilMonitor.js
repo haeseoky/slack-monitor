@@ -260,7 +260,7 @@ async function checkAndNotify() {
  */
 function startOilMonitoring() {
   checkAndNotify();
-  monitorInterval = setInterval(checkAndNotify, 5 * 60 * 1000); // 5 minutes
+  monitorInterval = setInterval(checkAndNotify, 60 * 60 * 1000); // 60 minutes
   logger.info('유가 시세 모니터링 시작 (5분 간격)');
 }
 
