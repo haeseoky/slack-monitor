@@ -227,12 +227,27 @@ async function checkAndNotify() {
       if (!result.success) {
         valueText = `⚠️ ${result.error}`;
       } else {
-        valueText = `⛽ *${result.price} ${result.unit}*`; 
+        valueText = `⛽ *${result.price} ${result.unit}*`;
+
+        // Add increase/decrease indicator
+        const prevPrice = previousRates[result.id];
+        if (prevPrice && prevPrice !== result.price) {
+          const prevNum = parseFloat(prevPrice.replace(/,/g, ''));
+          const currNum = parseFloat(result.price.replace(/,/g, ''));
+          const diff = currNum - prevNum;
+          const diffPercent = ((diff / prevNum) * 100).toFixed(2);
+
+          if (diff > 0) {
+            valueText += ` 📈 +${diff.toFixed(2)} (+${diffPercent}%)`;
+          } else if (diff < 0) {
+            valueText += ` 📉 ${diff.toFixed(2)} (${diffPercent}%)`;
+          }
+        }
       }
-      
+
       return {
         title: `${result.name}`,
-        value: `${valueText}\n<${result.targetUrl}|👉 상세 보기>`, 
+        value: `${valueText}\n<${result.targetUrl}|👉 상세 보기>`,
         short: false
       };
     });

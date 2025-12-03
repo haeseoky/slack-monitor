@@ -186,7 +186,22 @@ async function checkAndNotify() {
       } else {
         // e.g. 💰 1,470.00 원
         valueText = `💰 *${result.price} ${result.unit}*`;
-        
+
+        // Add increase/decrease indicator
+        const prevPrice = previousRates[result.id];
+        if (prevPrice && prevPrice !== result.price) {
+          const prevNum = parseFloat(prevPrice.replace(/,/g, ''));
+          const currNum = parseFloat(result.price.replace(/,/g, ''));
+          const diff = currNum - prevNum;
+          const diffPercent = ((diff / prevNum) * 100).toFixed(2);
+
+          if (diff > 0) {
+            valueText += ` 📈 +${diff.toFixed(2)} (+${diffPercent}%)`;
+          } else if (diff < 0) {
+            valueText += ` 📉 ${diff.toFixed(2)} (${diffPercent}%)`;
+          }
+        }
+
         // Description generation
         if (result.id === 'JPY_KRW') {
              descText = `(100엔 = ${result.price} ${result.unit})`;
@@ -194,10 +209,10 @@ async function checkAndNotify() {
              descText = `(1달러 = ${result.price} ${result.unit})`;
         }
       }
-      
+
       return {
         title: `${result.name}`,
-        value: `${valueText}\n${descText}\n<${result.targetUrl}|👉 실시간 차트 확인하기>`, 
+        value: `${valueText}\n${descText}\n<${result.targetUrl}|👉 실시간 차트 확인하기>`,
         short: false
       };
     });
