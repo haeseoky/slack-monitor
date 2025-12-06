@@ -177,6 +177,10 @@ async function checkAndNotify() {
   const webhook = new IncomingWebhook(webhookUrl);
 
   try {
+    // Determine overall price trend for attachment color
+    let priceIncreaseCount = 0;
+    let priceDecreaseCount = 0;
+
     const fields = results.map(result => {
       let valueText = '';
       let descText = '';
@@ -187,7 +191,7 @@ async function checkAndNotify() {
         // e.g. 💰 1,470.00 원
         valueText = `💰 *${result.price} ${result.unit}*`;
 
-        // Add increase/decrease indicator
+        // Add increase/decrease indicator with colored emoji and arrows
         const prevPrice = previousRates[result.id];
         if (prevPrice && prevPrice !== result.price) {
           const prevNum = parseFloat(prevPrice.replace(/,/g, ''));
@@ -196,9 +200,11 @@ async function checkAndNotify() {
           const diffPercent = ((diff / prevNum) * 100).toFixed(2);
 
           if (diff > 0) {
-            valueText += ` 📈 +${diff.toFixed(2)} (+${diffPercent}%)`;
+            valueText += `\n🔴 ↗ +${diff.toFixed(2)} (+${diffPercent}%)`;
+            priceIncreaseCount++;
           } else if (diff < 0) {
-            valueText += ` 📉 ${diff.toFixed(2)} (${diffPercent}%)`;
+            valueText += `\n🔵 ↘ ${diff.toFixed(2)} (${diffPercent}%)`;
+            priceDecreaseCount++;
           }
         }
 
@@ -217,11 +223,19 @@ async function checkAndNotify() {
       };
     });
 
+    // Determine attachment color based on overall trend
+    let attachmentColor = '#808080'; // Gray (neutral)
+    if (priceIncreaseCount > priceDecreaseCount) {
+      attachmentColor = '#FF4444'; // Red (price increase)
+    } else if (priceDecreaseCount > priceIncreaseCount) {
+      attachmentColor = '#4285F4'; // Blue (price decrease)
+    }
+
     await webhook.send({
       text: '💵 실시간 환율 정보 (Source: Naver Finance)',
       channel: '#currency',
       attachments: [{
-        color: '#2196F3',
+        color: attachmentColor,
         fields: fields,
         footer: `🤖 Currency Monitor · ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`,
         ts: Math.floor(Date.now() / 1000)
