@@ -12,6 +12,7 @@ module.exports = [
     webhookKey: 'health', // .env의 SLACK_WEBHOOK_URLS에서 사용할 키
     checkInterval: 600000, // 체크 간격 (밀리초) - 10분
     enabled: false, // 블로그 검색 비활성화
+    blockedKeywords: [], // 제목이나 내용에 포함 시 알림 제외할 키워드 목록
   },
   {
     id: 'naver-news-monimo',
@@ -21,6 +22,7 @@ module.exports = [
     webhookKey: 'health',
     checkInterval: 180000, // 체크 간격 (밀리초) - 3분 (하루 480회, API 한도의 1.9%)
     enabled: true,
+    blockedKeywords: [], // 예: ['광고', '스팸', '홍보']
   },
   {
     id: 'naver-cafe-monimo',
@@ -30,6 +32,7 @@ module.exports = [
     webhookKey: 'health',
     checkInterval: 180000, // 체크 간격 (밀리초) - 3분 (하루 480회, API 한도의 1.9%)
     enabled: true,
+    blockedKeywords: [],
   },
   // 추가 검색 조건 예시
   // {
@@ -40,5 +43,6 @@ module.exports = [
   //   webhookKey: 'health',
   //   checkInterval: 120000, // 2분
   //   enabled: false,
+  //   blockedKeywords: ['제외키워드1', '제외키워드2'], // 제목/내용에 이 단어들이 포함되면 알림 제외
   // },
 ];

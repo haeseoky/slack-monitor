@@ -258,6 +258,26 @@ async function notifySearchResult(searchConfig, post) {
 // }
 
 /**
+ * 차단 키워드 필터링 - 제목이나 설명에 차단 키워드가 포함되어 있는지 확인
+ */
+function isBlockedPost(post, blockedKeywords) {
+  if (!blockedKeywords || blockedKeywords.length === 0) {
+    return false;
+  }
+
+  const searchText = `${post.title} ${post.desc}`.toLowerCase();
+
+  for (const keyword of blockedKeywords) {
+    if (searchText.includes(keyword.toLowerCase())) {
+      logger.info(`[차단] "${post.title}" - 차단 키워드 "${keyword}" 포함`);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * 신규 검색 결과 확인 및 알림
  */
 async function checkNewSearchResults(searchConfig) {
@@ -308,16 +328,29 @@ async function checkNewSearchResults(searchConfig) {
     if (newPosts.length > 0) {
       logger.info(`[${searchConfig.id}] 신규 검색 결과 ${newPosts.length}개 발견`);
 
-      // 100개 이상이면 최신 10개만 알림
-      const notifyLimit = newPosts.length >= 100 ? 10 : 5;
+      // 차단 키워드 필터링
+      const blockedKeywords = searchConfig.blockedKeywords || [];
+      const filteredPosts = newPosts.filter(post => !isBlockedPost(post, blockedKeywords));
 
-      for (const post of newPosts.slice(0, notifyLimit)) {
-        await notifySearchResult(searchConfig, post);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+      const blockedCount = newPosts.length - filteredPosts.length;
+      if (blockedCount > 0) {
+        logger.info(`[${searchConfig.id}] 차단 키워드로 인해 ${blockedCount}개 게시글 제외`);
       }
 
-      if (newPosts.length > notifyLimit) {
-        logger.info(`[${searchConfig.id}] ${newPosts.length - notifyLimit}개의 추가 신규 게시글은 알림을 생략했습니다`);
+      if (filteredPosts.length === 0) {
+        logger.info(`[${searchConfig.id}] 차단 키워드 필터링 후 알림할 게시글 없음`);
+      } else {
+        // 100개 이상이면 최신 10개만 알림
+        const notifyLimit = filteredPosts.length >= 100 ? 10 : 5;
+
+        for (const post of filteredPosts.slice(0, notifyLimit)) {
+          await notifySearchResult(searchConfig, post);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+
+        if (filteredPosts.length > notifyLimit) {
+          logger.info(`[${searchConfig.id}] ${filteredPosts.length - notifyLimit}개의 추가 신규 게시글은 알림을 생략했습니다`);
+        }
       }
     } else {
       logger.info(`[${searchConfig.id}] 신규 검색 결과가 없습니다`);
@@ -372,8 +405,11 @@ function startAllSearchMonitoring(searchConfigs) {
 
   const searchTypeText = { blog: '블로그', news: '뉴스', cafe: '카페' };
   enabledSearches.forEach((search, index) => {
+    const blockedInfo = search.blockedKeywords && search.blockedKeywords.length > 0
+      ? ` [차단: ${search.blockedKeywords.join(', ')}]`
+      : '';
     logger.info(
-      `   ${index + 1}. [${searchTypeText[search.searchType]}] "${search.keyword}" → #${search.channel} (${(search.checkInterval || 600000) / 1000}초)`
+      `   ${index + 1}. [${searchTypeText[search.searchType]}] "${search.keyword}" → #${search.channel} (${(search.checkInterval || 600000) / 1000}초)${blockedInfo}`
     );
   });
 
