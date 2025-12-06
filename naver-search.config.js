@@ -32,7 +32,7 @@ module.exports = [
     webhookKey: 'health',
     checkInterval: 180000, // 체크 간격 (밀리초) - 3분 (하루 480회, API 한도의 1.9%)
     enabled: true,
-    blockedKeywords: ['텍사모','출석','걷기','출첵','인증','틱톡','추천','빗썸'],
+    blockedKeywords: ['텍사모','출석','걷기','출첵','인증','틱톡','추천','빗썸','기상'],
   },
   // 추가 검색 조건 예시
   // {
