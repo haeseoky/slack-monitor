@@ -257,7 +257,7 @@ function startCurrencyMonitoring() {
   checkAndNotify();
   
   // 5분(300초 * 1000ms) 간격으로 반복 실행
-  monitorInterval = setInterval(checkAndNotify, 60 * 60 * 1000);
+  monitorInterval = setInterval(checkAndNotify, 12 * 60 * 60 * 1000);
   logger.info('환율 모니터링이 시작되었습니다. (60분 간격, 변동 시 알림)');
 }
 
